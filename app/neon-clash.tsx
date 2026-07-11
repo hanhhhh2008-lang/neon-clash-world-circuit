@@ -17,6 +17,12 @@ type Fighter = {
   reach: number;
   mark: string;
   combo: { name: string; sequence: string[] };
+  ultimate: string;
+  personality: string;
+  bio: string;
+  costume: string;
+  kind: "human" | "youth" | "robot" | "monster" | "elder";
+  portrait: { sheet: "main" | "bonus"; index: number };
 };
 
 type Stage = { id: string; name: string; city: string; descriptor: string; color: string; accent: string; motif: "skyline" | "rail" | "market" | "forge" | "club" | "court" | "plaza" | "steppe" | "metro" | "harbour" };
@@ -55,16 +61,22 @@ type RoomConfig = { playerId: string; cpuId: string; stageId: string; difficulty
 type OpenRoom = { id: string; players: number; status: string; config: RoomConfig };
 
 const FIGHTERS: Fighter[] = [
-  { id: "kael", name: "KAEL", alias: "SUN BREAKER", city: "SEOUL", style: "Rushdown", special: "Solar Rift", quote: "Speed is a decision.", color: "#27f4ff", secondary: "#1768ff", speed: 9, power: 6, reach: 6, mark: "K", combo: { name: "SOLAR CHAIN", sequence: ["T", "T", "U", "L"] } },
-  { id: "zara", name: "ZARA", alias: "VOLT QUEEN", city: "LAGOS", style: "Pressure", special: "Thunder Step", quote: "Hear the storm arrive.", color: "#ff2dba", secondary: "#8a3bff", speed: 8, power: 7, reach: 5, mark: "Z", combo: { name: "VOLTAGE RUSH", sequence: ["T", "U", "Y", "L"] } },
-  { id: "atlas", name: "ATLAS", alias: "IRON SAINT", city: "ATHENS", style: "Grappler", special: "Titan Break", quote: "The ground remembers.", color: "#ff7648", secondary: "#ffb627", speed: 4, power: 10, reach: 6, mark: "A", combo: { name: "TITAN LOCK", sequence: ["Y", "K", "Y", "L"] } },
-  { id: "nyx", name: "NYX", alias: "VOID SIGNAL", city: "BERLIN", style: "Zoner", special: "Black Pulse", quote: "Distance is control.", color: "#9b6cff", secondary: "#ff2dba", speed: 6, power: 7, reach: 10, mark: "N", combo: { name: "VOID CASCADE", sequence: ["U", "T", "Y", "L"] } },
-  { id: "rio", name: "RIO", alias: "SKYLINE KID", city: "SÃO PAULO", style: "Aerial", special: "Comet Kick", quote: "Gravity is optional.", color: "#d8ff47", secondary: "#24df9b", speed: 10, power: 5, reach: 6, mark: "R", combo: { name: "COMET LADDER", sequence: ["U", "U", "K", "L"] } },
-  { id: "sable", name: "SABLE", alias: "NIGHT BLADE", city: "TOKYO", style: "Counter", special: "Zero Cut", quote: "Your move. My opening.", color: "#efefff", secondary: "#6676ff", speed: 8, power: 8, reach: 7, mark: "S", combo: { name: "ZERO VERDICT", sequence: ["T", "K", "Y", "L"] } },
-  { id: "mara", name: "MARA", alias: "RED ORBIT", city: "MEXICO CITY", style: "Balanced", special: "Meteor Arc", quote: "Burn bright. Hit hard.", color: "#ff405c", secondary: "#ff8b32", speed: 7, power: 8, reach: 7, mark: "M", combo: { name: "ORBIT BREAK", sequence: ["T", "Y", "U", "L"] } },
-  { id: "batu", name: "BATU", alias: "STEPPE WALL", city: "ULAANBAATAR", style: "Armor", special: "Stone Wake", quote: "I do not move.", color: "#41d7bf", secondary: "#2587a6", speed: 5, power: 9, reach: 5, mark: "B", combo: { name: "STEPPE QUAKE", sequence: ["K", "Y", "K", "L"] } },
-  { id: "lux", name: "LUX", alias: "PRISM FOX", city: "PARIS", style: "Trickster", special: "Mirror Dash", quote: "Catch the afterimage.", color: "#ffdc4a", secondary: "#ff4da9", speed: 9, power: 6, reach: 8, mark: "L", combo: { name: "PRISM FEINT", sequence: ["T", "U", "K", "L"] } },
-  { id: "oren", name: "OREN", alias: "TIDE MONK", city: "SYDNEY", style: "Control", special: "Breaker Wave", quote: "Breathe between impacts.", color: "#48a8ff", secondary: "#42f5c5", speed: 6, power: 7, reach: 9, mark: "O", combo: { name: "TIDAL FORM", sequence: ["U", "Y", "K", "L"] } },
+  { id: "kael", name: "KAEL", alias: "SUN BREAKER", city: "SEOUL", style: "Rushdown", special: "Solar Rift", ultimate: "HELIOS OVERDRIVE", personality: "Driven · Protective · Impatient", bio: "A courier who weaponized an illegal solar prosthetic to protect his district.", costume: "Asymmetric techwear jacket · armored right sleeve · reactor sneakers", quote: "Speed is a decision.", color: "#ff7a28", secondary: "#1768ff", speed: 9, power: 6, reach: 6, mark: "K", kind: "human", portrait: { sheet: "main", index: 0 }, combo: { name: "SOLAR CHAIN", sequence: ["T", "T", "U", "L"] } },
+  { id: "zara", name: "ZARA", alias: "VOLT QUEEN", city: "LAGOS", style: "Pressure", special: "Thunder Step", ultimate: "QUEEN'S TEMPEST", personality: "Magnetic · Fearless · Theatrical", bio: "A grid engineer who dances through voltage surges and never enters quietly.", costume: "Conductive captain coat · braided crown · insulated gauntlets", quote: "Hear the storm arrive.", color: "#347cff", secondary: "#ff2dba", speed: 8, power: 7, reach: 5, mark: "Z", kind: "human", portrait: { sheet: "main", index: 1 }, combo: { name: "VOLTAGE RUSH", sequence: ["T", "U", "Y", "L"] } },
+  { id: "atlas", name: "ATLAS", alias: "IRON SAINT", city: "ATHENS", style: "Grappler", special: "Titan Break", ultimate: "OLYMPUS DESCENDS", personality: "Patient · Honorable · Immovable", bio: "A museum conservator who rebuilt ceremonial armor into a kinetic grappling rig.", costume: "Bronze muscle cuirass · white mantle · articulated greaves", quote: "The ground remembers.", color: "#ff9d3f", secondary: "#f4d6a0", speed: 4, power: 10, reach: 6, mark: "A", kind: "human", portrait: { sheet: "main", index: 2 }, combo: { name: "TITAN LOCK", sequence: ["Y", "K", "Y", "L"] } },
+  { id: "nyx", name: "NYX", alias: "VOID SIGNAL", city: "BERLIN", style: "Zoner", special: "Black Pulse", ultimate: "EVENT HORIZON", personality: "Private · Analytical · Dry-witted", bio: "A signal pirate who bends arena light with a coat woven from programmable mesh.", costume: "Hooded mesh trench · holographic half-mask · signal gloves", quote: "Distance is control.", color: "#9b6cff", secondary: "#32204f", speed: 6, power: 7, reach: 10, mark: "N", kind: "human", portrait: { sheet: "main", index: 3 }, combo: { name: "VOID CASCADE", sequence: ["U", "T", "Y", "L"] } },
+  { id: "rio", name: "RIO", alias: "SKYLINE KID", city: "SÃO PAULO", style: "Aerial", special: "Comet Kick", ultimate: "ORBITAL SAMBA", personality: "Joyful · Restless · Daring", bio: "A rooftop courier and capoeira showstopper who treats every wall like a launchpad.", costume: "Street-athletic layers · reinforced knees · neon high-tops", quote: "Gravity is optional.", color: "#d8ff47", secondary: "#24df9b", speed: 10, power: 5, reach: 6, mark: "R", kind: "human", portrait: { sheet: "main", index: 4 }, combo: { name: "COMET LADDER", sequence: ["U", "U", "K", "L"] } },
+  { id: "sable", name: "SABLE", alias: "NIGHT BLADE", city: "TOKYO", style: "Counter", special: "Zero Cut", ultimate: "MIDNIGHT VERDICT", personality: "Reserved · Precise · Compassionate", bio: "A forensic fencer who predicts attacks by reading breath, balance, and fabric movement.", costume: "Tailored urban shinobi coat · red scarf · plated half-mask", quote: "Your move. My opening.", color: "#efefff", secondary: "#d62646", speed: 8, power: 8, reach: 7, mark: "S", kind: "human", portrait: { sheet: "main", index: 5 }, combo: { name: "ZERO VERDICT", sequence: ["T", "K", "Y", "L"] } },
+  { id: "mara", name: "MARA", alias: "RED ORBIT", city: "MEXICO CITY", style: "Balanced", special: "Meteor Arc", ultimate: "AZTEC SUPERNOVA", personality: "Warm · Competitive · Unbreakable", bio: "An aerospace mechanic who fused lucha pageantry with zero-gravity training.", costume: "Embroidered flight jacket · orbital belt · impact boots", quote: "Burn bright. Hit hard.", color: "#ff405c", secondary: "#ff8b32", speed: 7, power: 8, reach: 7, mark: "M", kind: "human", portrait: { sheet: "main", index: 6 }, combo: { name: "ORBIT BREAK", sequence: ["T", "Y", "U", "L"] } },
+  { id: "batu", name: "BATU", alias: "STEPPE WALL", city: "ULAANBAATAR", style: "Armor", special: "Stone Wake", ultimate: "ETERNAL BLUE SKY", personality: "Stoic · Loyal · Surprisingly gentle", bio: "A rescue captain whose layered armor absorbs force and returns it through the earth.", costume: "Futuristic deel coat · lamellar shoulders · heavy riding boots", quote: "I do not move.", color: "#41d7bf", secondary: "#354b68", speed: 5, power: 9, reach: 5, mark: "B", kind: "human", portrait: { sheet: "main", index: 7 }, combo: { name: "STEPPE QUAKE", sequence: ["K", "Y", "K", "L"] } },
+  { id: "lux", name: "LUX", alias: "PRISM FOX", city: "PARIS", style: "Trickster", special: "Mirror Dash", ultimate: "KALEIDOSCOPE HEIST", personality: "Playful · Elegant · Unreadable", bio: "A stage illusionist who turns refractive fashion into decoys and impossible angles.", costume: "Prismatic couture trench · fox visor · split-tail trousers", quote: "Catch the afterimage.", color: "#ffdc4a", secondary: "#a947ff", speed: 9, power: 6, reach: 8, mark: "L", kind: "human", portrait: { sheet: "main", index: 8 }, combo: { name: "PRISM FEINT", sequence: ["T", "U", "K", "L"] } },
+  { id: "oren", name: "OREN", alias: "TIDE MONK", city: "SYDNEY", style: "Control", special: "Breaker Wave", ultimate: "SOUTHERN DELUGE", personality: "Calm · Wry · Relentless", bio: "A coastal medic who learned to redirect momentum like water around stone.", costume: "Layered ocean robes · wrapped forearms · split training boots", quote: "Breathe between impacts.", color: "#48a8ff", secondary: "#42f5c5", speed: 6, power: 7, reach: 9, mark: "O", kind: "human", portrait: { sheet: "main", index: 9 }, combo: { name: "TIDAL FORM", sequence: ["U", "Y", "K", "L"] } },
+  { id: "axiom", name: "AXIOM-7", alias: "BLUE STANDARD", city: "ORBITAL LAB", style: "Adaptive", special: "Vector Copy", ultimate: "PERFECT RECALL", personality: "Curious · Literal · Learning humor", bio: "A tournament training robot that entered the circuit to understand why humans fight for joy.", costume: "Cobalt segmented chassis · gyroscopic joints · expression-ring display", quote: "New pattern acquired.", color: "#3b7cff", secondary: "#9bdcff", speed: 7, power: 7, reach: 7, mark: "7", kind: "robot", portrait: { sheet: "bonus", index: 0 }, combo: { name: "MACHINE LEARNING", sequence: ["T", "Y", "U", "L"] } },
+  { id: "cinder", name: "CINDER", alias: "MOSS COLOSSUS", city: "KRAKATOA", style: "Juggernaut", special: "Magma Bloom", ultimate: "MOUNTAIN AWAKES", personality: "Gentle · Ancient · Easily amused", bio: "A volcanic guardian who mistakes the World Circuit for an elaborate friendship ritual.", costume: "Basalt plates · moss mantle · glowing magma seams", quote: "Small friends hit loudly.", color: "#ff6b32", secondary: "#6fa85a", speed: 3, power: 10, reach: 8, mark: "C", kind: "monster", portrait: { sheet: "bonus", index: 1 }, combo: { name: "FAULT LINE", sequence: ["Y", "K", "Y", "L"] } },
+  { id: "miko", name: "MIKO", alias: "SPARK MAKER", city: "OSAKA", style: "Gadget", special: "Drone Pop", ultimate: "BRIGHT IDEA BARRAGE", personality: "Inventive · Cheerful · Stubborn", bio: "A 12-year-old junior inventor competing in supervised exhibition matches with a safety drone.", costume: "Age-appropriate utility jacket · leggings · goggles · reinforced sneakers", quote: "I fixed it while you blinked!", color: "#ffd43b", secondary: "#42c7ff", speed: 8, power: 4, reach: 9, mark: "M", kind: "youth", portrait: { sheet: "bonus", index: 2 }, combo: { name: "TOOLBOX TANGO", sequence: ["T", "U", "T", "L"] } },
+  { id: "teo", name: "TEO", alias: "RAIL RUNNER", city: "MADRID", style: "Skirmisher", special: "Kickflip Arc", ultimate: "CITYWIDE WALL RIDE", personality: "Brave · Social · Overconfident", bio: "A 13-year-old skating champion in padded exhibition gear who fights through speed challenges.", costume: "Age-appropriate teal hoodie · padded trousers · gloves · high-tops", quote: "Bet you can't keep up.", color: "#24d4c3", secondary: "#1768ff", speed: 10, power: 4, reach: 6, mark: "T", kind: "youth", portrait: { sheet: "bonus", index: 3 }, combo: { name: "RAIL COMBO", sequence: ["U", "U", "K", "L"] } },
+  { id: "jun", name: "JUN", alias: "QUIET COMET", city: "SINGAPORE", style: "Technical", special: "Paper Crane", ultimate: "THOUSAND LESSONS", personality: "Thoughtful · Polite · Fiercely focused", bio: "A 14-year-old academy champion taking part in non-contact holographic circuit bouts.", costume: "Age-appropriate layered academy uniform · forearm pads · training shoes", quote: "Practice makes possibilities.", color: "#8ea8ff", secondary: "#f1f5ff", speed: 7, power: 5, reach: 8, mark: "J", kind: "youth", portrait: { sheet: "bonus", index: 4 }, combo: { name: "COMET LESSON", sequence: ["T", "K", "U", "L"] } },
+  { id: "raku", name: "RAKU", alias: "TIPSY SAGE", city: "CHENGDU", style: "Unorthodox", special: "Stagger Step", ultimate: "NINE-CUP MIRAGE", personality: "Mischievous · Wise · Generous", bio: "A 72-year-old tavern storyteller whose legendary drunken style is mostly theatre and perfect balance.", costume: "Weathered teal coat · loose training trousers · travel gourd · rope sash", quote: "I wobble. The world falls.", color: "#e4bb68", secondary: "#42a7a0", speed: 6, power: 7, reach: 7, mark: "R", kind: "elder", portrait: { sheet: "bonus", index: 5 }, combo: { name: "WANDERING CUP", sequence: ["Y", "U", "T", "L"] } },
 ];
 
 const STAGES: Stage[] = [
@@ -99,11 +111,22 @@ function portraitStyle(fighter: Fighter) {
   return { "--fighter": fighter.color, "--fighter-2": fighter.secondary } as React.CSSProperties;
 }
 
+function portraitCropStyle(fighter: Fighter) {
+  const total = fighter.portrait.sheet === "main" ? 10 : 6;
+  const position = total === 1 ? 50 : fighter.portrait.index / (total - 1) * 100;
+  const image = fighter.portrait.sheet === "main" ? "/characters/neon-clash-roster-concept.webp" : "/characters/neon-clash-bonus-roster-concept.webp";
+  return { backgroundImage: `url(${image})`, backgroundPosition: `${position}% center` } as React.CSSProperties;
+}
+
+function FighterPortrait({ fighter, compact = false }: { fighter: Fighter; compact?: boolean }) {
+  return <span className={`fighter-portrait ${compact ? "compact" : "hero"} kind-${fighter.kind}`} style={portraitCropStyle(fighter)} role="img" aria-label={`${fighter.name}, ${fighter.costume}`} />;
+}
+
 function FighterCard({ fighter, selected, rival, onClick }: { fighter: Fighter; selected: boolean; rival: boolean; onClick: () => void }) {
   return (
     <button className={`fighter-card ${selected ? "is-selected" : ""} ${rival ? "is-rival" : ""}`} onClick={onClick} style={portraitStyle(fighter)} aria-pressed={selected}>
       <span className="fighter-number">{String(FIGHTERS.indexOf(fighter) + 1).padStart(2, "0")}</span>
-      <span className="portrait-mark" aria-hidden="true">{fighter.mark}</span>
+      <FighterPortrait fighter={fighter} compact />
       <span className="fighter-card-copy"><strong>{fighter.name}</strong><small>{fighter.style}</small></span>
     </button>
   );
@@ -235,18 +258,18 @@ export function NeonClash() {
       {screen === "select" ? (
         <section className="select-screen" id="top">
           <div className="select-heading">
-            <div><p className="eyebrow">FIGHTER SELECT / 10 CONTENDERS</p><h1>CHOOSE YOUR<br /><em>FREQUENCY</em></h1></div>
-            <p className="intro">Ten fighting styles. One broadcast arena. Select your contender, read the matchup, then take the world circuit live.</p>
+            <div><p className="eyebrow">FIGHTER SELECT / 16 CONTENDERS</p><h1>CHOOSE YOUR<br /><em>FREQUENCY</em></h1></div>
+            <p className="intro">Humans, youth exhibition heroes, robots, monsters, and one famously tipsy master. Read every personality and finishing art before taking the circuit live.</p>
           </div>
 
           <div className="versus-preview">
-            <FighterPanel fighter={player} side="player" />
+            <FighterPanel fighter={player} outfit={outfit} side="player" />
             <div className="vs-spine"><span>ROUND</span><strong>VS</strong><small>01</small></div>
-            <FighterPanel fighter={cpu} side="cpu" />
+            <FighterPanel fighter={cpu} outfit={outfit} side="cpu" />
           </div>
 
           <div className="roster-wrap">
-            <div className="roster-label"><span>ROSTER // SELECT P1</span><button onClick={() => randomRival(playerId)}>RANDOMIZE RIVAL ↻</button></div>
+            <div className="roster-label"><span>ROSTER // 16 DISTINCT ROLES // SELECT P1</span><button onClick={() => randomRival(playerId)}>RANDOMIZE RIVAL ↻</button></div>
             <div className="roster-grid">
               {FIGHTERS.map((fighter) => <FighterCard key={fighter.id} fighter={fighter} selected={fighter.id === playerId} rival={fighter.id === cpuId} onClick={() => { setPlayerId(fighter.id); if (fighter.id === cpuId) randomRival(fighter.id); }} />)}
             </div>
@@ -295,15 +318,17 @@ function RoomLobby({ room, code, setCode, busy, error, openRooms, createRoom, jo
   return <div className="online-backdrop"><section className="online-lobby"><button className="close-lobby" onClick={close}>×</button><p className="eyebrow">PUBLIC MATCHMAKING // LIVE SPECTATORS</p><h2>{room ? `ROOM ${room.id}` : "ENTER THE LOBBY"}</h2><p className="lobby-copy">Every room has exactly two fighter slots. Anyone who joins after both slots are filled enters as a live spectator.</p>{room ? <div className="room-console"><div className="slot-row"><span className="filled">P1<br /><b>HOST</b></span><i>VS</i><span className={room.players === 2 ? "filled" : "waiting"}>P2<br /><b>{room.players === 2 ? "READY" : "WAITING"}</b></span></div><div className="room-metrics"><span>{room.players}/2 PLAYERS</span><span>{room.spectators} WATCHING</span><span>{room.status.toUpperCase()}</span></div><div className="room-actions"><button onClick={share}>COPY ROOM LINK</button><button onClick={email}>EMAIL INVITE</button>{room.role === "host" && <button className="primary" disabled={room.players < 2} onClick={startFight}>{room.players < 2 ? "WAITING FOR P2" : "START MATCH"}</button>}{room.role !== "host" && <button className="primary" disabled>{room.role === "spectator" ? "WATCHING ROOM" : "WAITING FOR HOST"}</button>}</div></div> : <div className="lobby-grid"><div><b>CREATE A ROOM</b><span>Your selected fighters, arena, difficulty, and outfits become the room setup.</span><button className="primary" disabled={busy} onClick={createRoom}>CREATE PUBLIC ROOM</button></div><div><b>JOIN OR WATCH</b><input value={code} onChange={(event) => setCode(event.target.value.toUpperCase().slice(0, 6))} aria-label="Room code" placeholder="6-DIGIT ROOM CODE" /><button disabled={busy || code.length !== 6} onClick={() => joinRoom(false)}>JOIN ROOM</button><button disabled={busy || code.length !== 6} onClick={() => joinRoom(true)}>WATCH ONLY</button></div></div>}{error && <strong className="connection-state failed">{error}</strong>}{!room && openRooms.length > 0 && <div className="open-room-list"><b>OPEN ROOMS</b>{openRooms.map((item) => <div key={item.id}><span><strong>{item.id}</strong><small>{item.players}/2 · {item.status.toUpperCase()}</small></span><button onClick={() => joinRoom(false, item.id)}>{item.players < 2 ? "JOIN" : "WATCH"}</button></div>)}</div>}</section></div>;
 }
 
-function FighterPanel({ fighter, side }: { fighter: Fighter; side: "player" | "cpu" }) {
+function FighterPanel({ fighter, outfit, side }: { fighter: Fighter; outfit: Outfit; side: "player" | "cpu" }) {
   return (
     <article className={`fighter-panel ${side}`} style={portraitStyle(fighter)}>
       <div className="panel-no">{side === "player" ? "P1" : "CPU"}</div>
-      <div className="hero-mark" aria-hidden="true"><span>{fighter.mark}</span></div>
+      <div className="hero-mark"><FighterPortrait fighter={fighter} /></div>
       <div className="fighter-copy">
-        <p>{fighter.city} {"//"} {fighter.style}</p><h2>{fighter.name}</h2><h3>{fighter.alias}</h3><blockquote>“{fighter.quote}”</blockquote>
+        <p>{fighter.city} {"//"} {fighter.style} {"//"} {fighter.kind.toUpperCase()}</p><h2>{fighter.name}</h2><h3>{fighter.alias}</h3><blockquote>“{fighter.quote}”</blockquote>
+        <div className="personality-card"><strong>{fighter.personality}</strong><span>{fighter.bio}</span><small>{outfit.name}: {fighter.costume}</small></div>
         <div className="stat-row"><Stat label="SPD" value={fighter.speed} /><Stat label="PWR" value={fighter.power} /><Stat label="RNG" value={fighter.reach} /></div>
         <div className="special-tag"><span>SPECIAL</span><strong>{fighter.special}</strong></div>
+        <div className="ultimate-tag"><span>CINEMATIC FINISH</span><strong>{fighter.ultimate}</strong></div>
         <div className="combo-tag"><span>{fighter.combo.name}</span><strong>{fighter.combo.sequence.join(" › ")}</strong></div>
       </div>
     </article>
@@ -338,7 +363,8 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
     drawBackground(bg, W, H, stage);
 
     const spriteCache = new Map<string, HTMLCanvasElement>();
-    for (const f of [player, cpu]) spriteCache.set(f.id, buildSprite(f, outfit));
+    const spritePoses: SpritePose[] = ["idle", "punch", "kick", "special", "guard", "hurt"];
+    for (const f of [player, cpu]) for (const pose of spritePoses) spriteCache.set(`${f.id}:${pose}`, buildSprite(f, outfit, pose));
 
     const p1 = createCombatant(player, 350, 1);
     const p2 = createCombatant(cpu, 930, -1);
@@ -362,6 +388,9 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
     const inputHistory: Array<{ key: string; at: number }> = [];
     let comboBonus = 0;
     let comboCallout = 0;
+    let finisherTime = 0;
+    let finisherName = "";
+    let finisherColor = player.color;
 
     const recordAction = (key: string) => {
       const now = performance.now(); inputHistory.push({ key, at: now });
@@ -405,6 +434,10 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       const costs = { lightPunch: 0, heavyPunch: 0, lightKick: 0, heavyKick: 0, special: 25, impact: 32 };
       if (c.drive < costs[type]) return;
       c.drive -= costs[type]; c.attack = type; c.attackTime = 0; c.attackHit = false; c.guarding = false;
+      if (type === "special") {
+        burst(c.x + c.facing * 58, c.y - 126, c.fighter.color, c === p1 && comboBonus > 0 ? 34 : 14);
+        if (c === p1 && comboBonus > 0) { finisherTime = 1.15; finisherName = c.fighter.ultimate; finisherColor = c.fighter.color; shake = 16; }
+      }
       if (type === "special" && (c.fighter.style === "Zoner" || c.fighter.style === "Control")) {
         projectiles.push({ x: c.x + c.facing * 70, y: c.y - 116, vx: c.facing * (520 + c.fighter.reach * 10), life: 1.8, owner: c, color: c.fighter.color, damage: 13 + c.fighter.power * 0.45 + (c === p1 ? comboBonus : 0) });
       }
@@ -503,7 +536,7 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
         }
       }
 
-      comboCallout = Math.max(0, comboCallout - dt);
+      comboCallout = Math.max(0, comboCallout - dt); finisherTime = Math.max(0, finisherTime - dt);
       const local = { jump: !!inputs.jump, crouch: !!inputs.crouch, guard: !!inputs.guard, lightPunch: !!inputs.lightPunch, heavyPunch: !!inputs.heavyPunch, lightKick: !!inputs.lightKick, heavyKick: !!inputs.heavyKick, special: !!inputs.special, impact: !!inputs.impact };
       const localMove = (inputs.left ? -1 : 0) + (inputs.right ? 1 : 0);
       const remote = remoteInputRef.current ?? {};
@@ -531,7 +564,8 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
     };
 
     const drawCombatant = (c: Combatant) => {
-      const sprite = spriteCache.get(c.fighter.id)!;
+      const pose: SpritePose = c.hurtTime > 0 ? "hurt" : c.guarding ? "guard" : c.attack === "lightPunch" || c.attack === "heavyPunch" || c.attack === "impact" ? "punch" : c.attack === "lightKick" || c.attack === "heavyKick" ? "kick" : c.attack === "special" ? "special" : "idle";
+      const sprite = spriteCache.get(`${c.fighter.id}:${pose}`)!;
       const attack = c.attack ? attackData(c.attack) : null;
       const reach = c.attack && attack && c.attackTime > attack.activeA * 0.75 && c.attackTime < attack.activeB ? (c.attack === "lightPunch" ? 18 : c.attack === "lightKick" ? 26 : c.attack === "impact" ? 44 : 34) : 0;
       const bob = c.grounded ? Math.sin(performance.now() * 0.004) * 2 : 0;
@@ -566,7 +600,14 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       drawHud();
       if (roundState === "intro") drawCenterText(`ROUND ${round}`, "FIGHT");
       if (roundState === "ko") drawCenterText("K.O.", p1.health > p2.health ? p1.fighter.name : p2.fighter.name);
-      if (comboCallout > 0) { ctx.textAlign = "center"; ctx.fillStyle = p1.fighter.color; ctx.font = "italic 900 32px Arial"; ctx.fillText(player.combo.name, W / 2, 175); ctx.font = "800 13px Arial"; ctx.fillStyle = "#eefcff"; ctx.fillText("SKILL COMBO ACTIVATED", W / 2, 198); }
+      if (comboCallout > 0) { ctx.textAlign = "center"; ctx.fillStyle = p1.fighter.color; ctx.font = "italic 900 32px Arial"; ctx.fillText(player.combo.name, W / 2, 175); ctx.font = "800 13px Arial"; ctx.fillStyle = "#eefcff"; ctx.fillText("FINISHER ARMED — PRESS L", W / 2, 198); }
+      if (finisherTime > 0) {
+        const pulse = .68 + Math.sin(performance.now() * .035) * .12;
+        ctx.globalAlpha = pulse; ctx.fillStyle = "#02030a"; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
+        ctx.fillStyle = finisherColor; ctx.fillRect(0, 132, W, 5); ctx.fillRect(0, 575, W, 5);
+        ctx.textAlign = "center"; ctx.fillStyle = "#f7fdff"; ctx.font = "italic 950 62px Arial"; ctx.fillText(finisherName, W / 2, 345);
+        ctx.fillStyle = finisherColor; ctx.font = "900 14px Arial"; ctx.fillText(`${player.name} // CINEMATIC FINISH`, W / 2, 380);
+      }
       ctx.restore();
     };
 
@@ -646,22 +687,90 @@ function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, sta
   ctx.globalAlpha = 0.05; ctx.fillStyle = "#fff"; for (let y = 0; y < h; y += 4) ctx.fillRect(0, y, w, 1); ctx.globalAlpha = 1;
 }
 
-function buildSprite(fighter: Fighter, outfit: Outfit) {
+type SpritePose = "idle" | "punch" | "kick" | "special" | "guard" | "hurt";
+
+function buildSprite(fighter: Fighter, outfit: Outfit, pose: SpritePose = "idle") {
   const c = document.createElement("canvas"); c.width = 224; c.height = 300; const x = c.getContext("2d")!;
-  const g = x.createLinearGradient(20, 20, 190, 280); g.addColorStop(0, fighter.color); g.addColorStop(1, fighter.secondary);
-  x.fillStyle = "rgba(0,0,0,.28)"; x.beginPath(); x.ellipse(112, 286, 74, 12, 0, 0, Math.PI * 2); x.fill();
-  x.fillStyle = g; x.strokeStyle = "#060813"; x.lineWidth = 8; x.lineJoin = "round";
-  x.beginPath(); x.moveTo(77, 124); x.lineTo(58, 204); x.lineTo(37, 279); x.lineTo(77, 279); x.lineTo(106, 200); x.lineTo(119, 130); x.closePath(); x.fill(); x.stroke();
-  x.beginPath(); x.moveTo(132, 132); x.lineTo(148, 208); x.lineTo(162, 279); x.lineTo(198, 279); x.lineTo(183, 197); x.lineTo(169, 118); x.closePath(); x.fill(); x.stroke();
-  x.beginPath(); x.moveTo(72, 92); x.quadraticCurveTo(112, 64, 165, 91); x.lineTo(175, 174); x.quadraticCurveTo(119, 206, 60, 169); x.closePath(); x.fill(); x.stroke();
-  if (outfit.cut === "sleek") { x.fillStyle = "#070a14"; x.beginPath(); x.moveTo(78, 92); x.lineTo(113, 155); x.lineTo(158, 92); x.lineTo(168, 164); x.lineTo(64, 164); x.closePath(); x.fill(); x.strokeStyle = fighter.color; x.lineWidth = 4; x.stroke(); }
-  if (outfit.cut === "heatwave") { x.fillStyle = "#070a14"; x.fillRect(67, 136, 100, 32); x.clearRect(88, 105, 50, 28); x.strokeStyle = fighter.color; x.lineWidth = 4; x.strokeRect(67, 136, 100, 32); }
-  x.beginPath(); x.moveTo(72, 105); x.lineTo(21, 177); x.lineTo(53, 190); x.lineTo(98, 133); x.closePath(); x.fill(); x.stroke();
-  x.beginPath(); x.moveTo(154, 102); x.lineTo(205, 157); x.lineTo(184, 183); x.lineTo(137, 135); x.closePath(); x.fill(); x.stroke();
-  x.beginPath(); x.arc(117, 56, fighter.style === "Grappler" ? 42 : 34, 0, Math.PI * 2); x.fill(); x.stroke();
-  x.fillStyle = "#effcff"; x.globalAlpha = 0.85; x.fillRect(91, 49, 55, 8); x.globalAlpha = 1;
-  if (fighter.style === "Zoner" || fighter.style === "Trickster") { x.strokeStyle = fighter.color; x.lineWidth = 9; x.beginPath(); x.moveTo(82, 62); x.quadraticCurveTo(15, 80, 30, 140); x.stroke(); }
-  if (fighter.style === "Grappler" || fighter.style === "Armor") { x.fillStyle = "#11182b"; x.fillRect(20, 160, 40, 38); x.fillRect(178, 151, 38, 38); }
-  x.fillStyle = "rgba(5,7,18,.6)"; x.font = "900 54px Arial"; x.textAlign = "center"; x.fillText(fighter.mark, 117, 150);
+  x.lineJoin = "round"; x.lineCap = "round";
+  x.fillStyle = "rgba(0,0,0,.34)"; x.beginPath(); x.ellipse(112, 287, fighter.kind === "monster" ? 92 : 70, 10, 0, 0, Math.PI * 2); x.fill();
+
+  const outline = "#050814";
+  const shade = outfit.cut === "sleek" ? "#090d19" : outfit.cut === "heatwave" ? "#25203a" : "#11182a";
+  const line = (points: Array<[number, number]>, width: number, color: string, inner = width - 8) => {
+    x.strokeStyle = outline; x.lineWidth = width; x.beginPath(); points.forEach(([px, py], index) => index ? x.lineTo(px, py) : x.moveTo(px, py)); x.stroke();
+    x.strokeStyle = color; x.lineWidth = Math.max(3, inner); x.beginPath(); points.forEach(([px, py], index) => index ? x.lineTo(px, py) : x.moveTo(px, py)); x.stroke();
+  };
+  const plate = (px: number, py: number, rx: number, ry: number, color: string | CanvasGradient) => { x.fillStyle = color; x.strokeStyle = outline; x.lineWidth = 6; x.beginPath(); x.ellipse(px, py, rx, ry, 0, 0, Math.PI * 2); x.fill(); x.stroke(); };
+
+  if (fighter.kind === "monster") {
+    const rocks: Array<[number, number, number, number]> = [[112,70,38,32],[82,112,38,34],[137,113,43,38],[65,163,37,48],[157,163,42,49],[88,211,38,52],[139,212,40,52],[62,260,35,25],[160,260,38,25]];
+    for (const [px,py,rx,ry] of rocks) { const g = x.createRadialGradient(px-10,py-12,4,px,py,rx); g.addColorStop(0,"#6b685d"); g.addColorStop(1,"#252925"); plate(px,py,rx,ry,g); }
+    x.strokeStyle = fighter.color; x.lineWidth = 5; x.globalAlpha = .85; for (const [px,py] of [[94,92],[128,139],[76,189],[145,226]]) { x.beginPath(); x.moveTo(px-12,py-9); x.lineTo(px,py+5); x.lineTo(px+13,py-8); x.stroke(); } x.globalAlpha = 1;
+    x.fillStyle = "#91bd62"; x.beginPath(); x.ellipse(112,42,48,10,0,0,Math.PI*2); x.fill(); x.fillStyle = "#ffd06a"; x.beginPath(); x.arc(97,67,5,0,Math.PI*2); x.arc(127,67,5,0,Math.PI*2); x.fill();
+    return c;
+  }
+
+  if (fighter.kind === "robot") {
+    line([[78,145],[65,203],[52,270]],31,"#2455c6"); line([[144,145],[157,203],[172,270]],31,"#2455c6");
+    line(pose === "punch" ? [[75,105],[40,112],[8,104]] : [[75,105],[47,158],[39,205]],28,"#357cff");
+    line(pose === "special" ? [[148,104],[177,81],[205,49]] : [[148,104],[182,157],[190,204]],28,"#357cff");
+    x.fillStyle = "#19449f"; x.strokeStyle = outline; x.lineWidth = 7; x.beginPath(); x.moveTo(69,91); x.lineTo(93,76); x.lineTo(136,76); x.lineTo(158,95); x.lineTo(150,166); x.lineTo(75,166); x.closePath(); x.fill(); x.stroke();
+    for (const [px,py] of [[68,204],[157,204],[48,157],[178,157]]) plate(px,py,13,13,"#78b8ff");
+    plate(112,58,35,35,"#224fb4"); x.strokeStyle = "#85e9ff"; x.lineWidth = 6; x.beginPath(); x.arc(112,58,20,0,Math.PI*2); x.stroke(); x.fillStyle = "#e9ffff"; x.beginPath(); x.arc(112,58,6,0,Math.PI*2); x.fill();
+    x.fillStyle = "#8beeff"; x.beginPath(); x.arc(112,119,12,0,Math.PI*2); x.fill();
+    return c;
+  }
+
+  const youth = fighter.kind === "youth";
+  const elder = fighter.kind === "elder";
+  const scale = youth ? .82 : elder ? .92 : 1;
+  const yShift = youth ? 48 : elder ? 22 : 0;
+  x.save(); x.translate(112, 292); x.scale(scale, scale); x.translate(-112, -292 + yShift);
+  const skinColors: Record<string,string> = { kael:"#d7a079",zara:"#71452f",atlas:"#b77b58",nyx:"#d3a78f",rio:"#a75e3e",sable:"#d3a18b",mara:"#b96d50",batu:"#a86e4e",lux:"#e1b099",oren:"#c89472",miko:"#e7b38d",teo:"#bd7b55",jun:"#d9a481",raku:"#c58c66" };
+  const skin = skinColors[fighter.id] ?? "#c98d68";
+  const pants = outfit.cut === "heatwave" ? fighter.secondary : shade;
+  const coatIds = new Set(["zara","nyx","sable","batu","lux","oren","raku"]);
+  const armored = new Set(["atlas","batu"]);
+
+  if (coatIds.has(fighter.id)) {
+    x.fillStyle = fighter.id === "raku" ? "#296a68" : shade; x.strokeStyle = outline; x.lineWidth = 7; x.beginPath(); x.moveTo(70,118); x.lineTo(151,118); x.lineTo(181,272); x.lineTo(120,246); x.lineTo(103,272); x.lineTo(45,267); x.closePath(); x.fill(); x.stroke();
+    x.strokeStyle = fighter.color; x.lineWidth = 3; x.beginPath(); x.moveTo(78,124); x.lineTo(102,242); x.moveTo(143,124); x.lineTo(120,242); x.stroke();
+  }
+
+  const leftLeg: Array<[number,number]> = pose === "kick" ? [[92,174],[73,213],[24,196]] : [[92,170],[78,224],[67,278]];
+  const rightLeg: Array<[number,number]> = pose === "kick" ? [[132,173],[146,226],[173,274]] : [[132,170],[146,226],[160,278]];
+  line(leftLeg, youth ? 27 : 34, pants); line(rightLeg, youth ? 27 : 34, pants);
+  line([[leftLeg.at(-1)![0]-5,leftLeg.at(-1)![1]],[leftLeg.at(-1)![0]+15,leftLeg.at(-1)![1]]], youth ? 18 : 24, fighter.id === "atlas" ? "#a66d35" : "#141a28", youth ? 13 : 17);
+  line([[rightLeg.at(-1)![0]-7,rightLeg.at(-1)![1]],[rightLeg.at(-1)![0]+15,rightLeg.at(-1)![1]]], youth ? 18 : 24, fighter.id === "atlas" ? "#a66d35" : "#141a28", youth ? 13 : 17);
+
+  const torso = x.createLinearGradient(70,85,155,180); torso.addColorStop(0,fighter.color); torso.addColorStop(1,fighter.secondary);
+  x.fillStyle = torso; x.strokeStyle = outline; x.lineWidth = 8; x.beginPath(); x.moveTo(73,94); x.quadraticCurveTo(111,73,151,95); x.lineTo(158,171); x.quadraticCurveTo(112,192,65,170); x.closePath(); x.fill(); x.stroke();
+  if (armored.has(fighter.id)) { x.fillStyle = "rgba(9,12,20,.5)"; for (let row=0;row<3;row++) for (let col=0;col<3;col++) x.fillRect(78+col*23,105+row*19,18,13); }
+  else { x.strokeStyle = "rgba(245,255,255,.5)"; x.lineWidth = 3; x.beginPath(); x.moveTo(112,91); x.lineTo(112,171); x.moveTo(80,131); x.lineTo(145,131); x.stroke(); }
+
+  const leftArm: Array<[number,number]> = pose === "guard" ? [[76,105],[92,132],[103,89]] : pose === "hurt" ? [[76,105],[46,126],[31,102]] : [[76,105],[49,157],[38,205]];
+  const rightArm: Array<[number,number]> = pose === "punch" ? [[148,105],[181,109],[216,102]] : pose === "special" ? [[148,105],[177,76],[195,34]] : pose === "guard" ? [[148,105],[132,132],[120,91]] : [[148,105],[181,158],[188,204]];
+  line(leftArm, youth ? 24 : 31, fighter.id === "atlas" ? "#b38146" : fighter.color);
+  line(rightArm, youth ? 24 : 31, fighter.id === "kael" ? "#f26b25" : fighter.secondary);
+  plate(leftArm.at(-1)![0],leftArm.at(-1)![1],youth?10:13,youth?10:13,skin); plate(rightArm.at(-1)![0],rightArm.at(-1)![1],youth?10:13,youth?10:13,skin);
+
+  if (fighter.id === "miko") { x.fillStyle = "#ffd43b"; x.strokeStyle = outline; x.lineWidth = 5; x.beginPath(); x.arc(183,65,18,0,Math.PI*2); x.fill(); x.stroke(); x.fillStyle="#7ef1ff"; x.beginPath(); x.arc(183,65,6,0,Math.PI*2); x.fill(); }
+  if (fighter.id === "mara") { x.fillStyle = "#f3f1e8"; x.strokeStyle = fighter.color; x.lineWidth=4; x.beginPath(); x.moveTo(82,100); x.lineTo(112,122); x.lineTo(143,100); x.lineTo(135,146); x.lineTo(88,146); x.closePath(); x.fill(); x.stroke(); }
+  if (fighter.id === "lux") { x.fillStyle="rgba(255,255,255,.35)"; for(let i=0;i<4;i++){x.beginPath();x.moveTo(72+i*20,112);x.lineTo(88+i*20,134);x.lineTo(70+i*20,154);x.closePath();x.fill();} }
+  if (fighter.id === "oren") { x.fillStyle="#e9f7f4"; x.fillRect(103,96,15,78); x.strokeStyle=fighter.color; x.lineWidth=4; x.beginPath(); x.moveTo(65,151); x.lineTo(157,132); x.stroke(); }
+
+  plate(112,59, youth ? 27 : 33, youth ? 31 : 37, skin);
+  x.fillStyle = fighter.id === "lux" ? "#e9d6c4" : fighter.id === "raku" ? "#f2f0e7" : "#151522";
+  x.beginPath();
+  if (fighter.id === "zara") { x.arc(112,52,39,Math.PI,Math.PI*2); for(let i=0;i<5;i++) x.rect(78+i*15,48,7,48); }
+  else if (fighter.id === "raku") { x.arc(112,47,37,Math.PI,Math.PI*2); x.moveTo(80,50); x.quadraticCurveTo(57,74,70,101); x.moveTo(144,50); x.quadraticCurveTo(169,79,151,105); }
+  else { x.moveTo(79,57); x.quadraticCurveTo(82,12,113,24); x.quadraticCurveTo(151,14,147,64); x.lineTo(135,48); x.lineTo(124,60); x.lineTo(111,43); x.lineTo(98,59); x.closePath(); }
+  x.fill();
+  if (fighter.id === "nyx" || fighter.id === "sable") { x.fillStyle="#101523"; x.fillRect(82,55,60,22); x.strokeStyle=fighter.color; x.lineWidth=3; x.strokeRect(87,59,50,12); }
+  else if (fighter.id === "lux") { x.fillStyle="#b65cff"; x.beginPath(); x.moveTo(84,54); x.lineTo(104,46); x.lineTo(112,58); x.lineTo(121,46); x.lineTo(141,54); x.lineTo(131,70); x.lineTo(94,70); x.closePath(); x.fill(); }
+  else { x.fillStyle="#10121c"; x.fillRect(92,58,12,4); x.fillRect(121,58,12,4); }
+  if (elder) { x.fillStyle="#eee7db"; x.beginPath(); x.moveTo(89,73); x.quadraticCurveTo(112,111,137,73); x.quadraticCurveTo(130,125,112,118); x.quadraticCurveTo(91,123,89,73); x.fill(); }
+  x.fillStyle = fighter.color; x.globalAlpha=.8; x.fillRect(98,116,28,7); x.globalAlpha=1;
+  x.restore();
   return c;
 }

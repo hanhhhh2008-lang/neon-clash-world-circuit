@@ -1,6 +1,8 @@
 # Neon Clash — World Circuit
 
-Neon Clash is an original, browser-playable 2D fighting game inspired by the pace and spectacle of modern arcade fighters. It includes ten fighters, ten stages, character-specific combo skills, adaptive CPU play, public two-player rooms, and live spectators.
+Neon Clash is an original, browser-playable 2D fighting game inspired by the pace and spectacle of modern arcade fighters. It includes sixteen fighters, ten stages, character-specific combo skills and cinematic finishes, adaptive CPU play, public two-player rooms, and live spectators.
+
+The expanded roster includes adult martial artists, three age-appropriately dressed youth exhibition fighters, a humanoid robot, a volcanic monster, and an elderly tipsy-style master. Every fighter has a personality profile, story, detailed costume language, special move, and non-graphic cinematic finisher.
 
 ## Controls
 

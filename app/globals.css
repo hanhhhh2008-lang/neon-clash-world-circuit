@@ -28,22 +28,28 @@ button { color: inherit; }
 .select-heading h1 em { color: transparent; -webkit-text-stroke: 2px var(--magenta); text-shadow: 10px 8px 0 rgba(255,45,186,.09); }
 .intro { max-width: 520px; border-left: 3px solid var(--magenta); margin: 0 0 4px; padding: 2px 0 2px 20px; color: #aab7cd; font-size: 14px; line-height: 1.65; }
 
-.versus-preview { min-height: 520px; display: grid; grid-template-columns: 1fr 80px 1fr; border: 1px solid var(--line); background: rgba(6,10,25,.8); position: relative; overflow: hidden; clip-path: polygon(16px 0,100% 0,100% calc(100% - 16px),calc(100% - 16px) 100%,0 100%,0 16px); }
+.versus-preview { min-height: 630px; display: grid; grid-template-columns: 1fr 80px 1fr; border: 1px solid var(--line); background: rgba(6,10,25,.8); position: relative; overflow: hidden; clip-path: polygon(16px 0,100% 0,100% calc(100% - 16px),calc(100% - 16px) 100%,0 100%,0 16px); }
 .versus-preview::before { content: ""; position: absolute; inset: 0; background: linear-gradient(120deg, rgba(39,244,255,.08), transparent 45%, rgba(255,45,186,.08)); pointer-events: none; }
 .fighter-panel { min-width: 0; position: relative; display: flex; align-items: flex-end; overflow: hidden; background: linear-gradient(135deg, color-mix(in srgb, var(--fighter) 10%, transparent), transparent 55%); }
 .fighter-panel.cpu { flex-direction: row-reverse; text-align: right; background: linear-gradient(225deg, color-mix(in srgb, var(--fighter) 10%, transparent), transparent 55%); }
 .panel-no { position: absolute; top: 22px; left: 25px; font-weight: 900; font-size: 11px; letter-spacing: .18em; color: var(--fighter); }
 .cpu .panel-no { left: auto; right: 25px; }
-.hero-mark { flex: 0 0 46%; height: 100%; position: relative; display: grid; place-items: center; filter: drop-shadow(0 0 34px color-mix(in srgb, var(--fighter) 28%, transparent)); }
-.hero-mark::before { content: ""; position: absolute; width: 75%; height: 62%; bottom: 0; background: linear-gradient(145deg, var(--fighter), var(--fighter-2)); clip-path: polygon(28% 0,72% 0,90% 20%,82% 45%,100% 100%,58% 100%,50% 62%,42% 100%,0 100%,18% 45%,10% 20%); border-radius: 42% 42% 10% 10%; opacity: .9; }
-.hero-mark::after { content: ""; position: absolute; width: 19%; aspect-ratio: 1; top: 16%; border-radius: 50%; background: var(--fighter); box-shadow: 0 0 0 13px #081020, 0 0 0 16px var(--fighter); }
-.hero-mark span { position: relative; z-index: 1; font-size: clamp(150px, 18vw, 310px); font-weight: 950; font-style: italic; color: rgba(5,7,18,.47); line-height: 1; transform: translateY(30px); }
+.hero-mark { flex: 0 0 48%; height: 100%; position: relative; overflow: hidden; filter: drop-shadow(0 0 34px color-mix(in srgb, var(--fighter) 28%, transparent)); background: radial-gradient(circle at 50% 58%, color-mix(in srgb, var(--fighter) 24%, transparent), transparent 64%); }
+.hero-mark::after { content: ""; position: absolute; inset: auto 5% 0; height: 22%; background: linear-gradient(transparent, color-mix(in srgb, var(--fighter) 18%, #030611)); pointer-events: none; }
+.fighter-portrait { display: block; background-repeat: no-repeat; background-size: auto 100%; background-color: #070b17; }
+.fighter-portrait.hero { position: absolute; inset: 4% -10% 0; height: 96%; background-color: transparent; filter: saturate(1.12) contrast(1.04); }
+.cpu .fighter-portrait.hero { transform: scaleX(-1); }
 .fighter-copy { position: relative; z-index: 2; flex: 1; padding: 60px 28px 35px; }
 .fighter-copy > p { color: var(--fighter); font-size: 9px; letter-spacing: .18em; font-weight: 900; }
 .fighter-copy h2 { font-size: clamp(42px, 5vw, 82px); line-height: .8; margin: 11px 0 12px; font-style: italic; letter-spacing: -.07em; }
 .fighter-copy h3 { margin: 0; font-size: 11px; letter-spacing: .23em; color: #a5b4cd; }
 .fighter-copy blockquote { margin: 30px 0 22px; color: #cbd6e7; font-size: 12px; line-height: 1.5; }
 .cpu .fighter-copy blockquote { margin-left: auto; }
+.personality-card { display: grid; gap: 5px; max-width: 330px; margin: 0 0 18px; padding: 11px 12px; border-left: 2px solid var(--fighter); background: rgba(3,6,15,.62); text-align: left; }
+.cpu .personality-card { margin-left: auto; border-left: 0; border-right: 2px solid var(--fighter); text-align: right; }
+.personality-card strong { color: var(--fighter); font-size: 8px; letter-spacing: .1em; }
+.personality-card span { color: #a8b6ca; font-size: 9px; line-height: 1.45; }
+.personality-card small { color: #71829b; font-size: 7px; line-height: 1.35; text-transform: uppercase; letter-spacing: .05em; }
 .stat-row { display: grid; gap: 9px; }
 .stat-row > div { display: grid; grid-template-columns: 30px 1fr 18px; align-items: center; gap: 8px; font-size: 8px; font-weight: 900; color: #8b9bb4; }
 .stat-row i { display: block; height: 3px; background: #28334d; }
@@ -52,6 +58,9 @@ button { color: inherit; }
 .special-tag { display: inline-flex; align-items: center; gap: 10px; margin-top: 24px; padding: 8px 11px; border: 1px solid color-mix(in srgb, var(--fighter) 50%, #24304a); background: rgba(5,7,18,.65); }
 .special-tag span { font-size: 7px; letter-spacing: .15em; color: var(--fighter); }
 .special-tag strong { font-size: 9px; letter-spacing: .08em; }
+.ultimate-tag { display: flex; align-items: center; gap: 9px; margin-top: 8px; padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--fighter) 30%, #2b3550); background: linear-gradient(90deg, color-mix(in srgb, var(--fighter) 12%, transparent), rgba(5,7,18,.68)); }
+.ultimate-tag span { color: #8292aa; font-size: 6px; letter-spacing: .13em; }
+.ultimate-tag strong { color: var(--fighter); font-size: 8px; letter-spacing: .1em; }
 .combo-tag { margin-top: 10px; display: grid; gap: 4px; }
 .combo-tag span { color: #7f91aa; font-size: 7px; letter-spacing: .15em; }
 .combo-tag strong { color: var(--fighter); font-size: 10px; letter-spacing: .14em; }
@@ -63,15 +72,19 @@ button { color: inherit; }
 .roster-wrap, .stage-select { margin-top: 18px; border: 1px solid var(--line); background: #080d1b; }
 .roster-label { min-height: 42px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; color: #8291aa; border-bottom: 1px solid var(--line); font-size: 9px; letter-spacing: .16em; font-weight: 900; }
 .roster-label button { color: var(--cyan); background: none; border: 0; font-size: 8px; letter-spacing: .12em; cursor: pointer; }
-.roster-grid { display: grid; grid-template-columns: repeat(10, 1fr); }
-.fighter-card { min-width: 0; height: 145px; position: relative; border: 0; border-right: 1px solid var(--line); background: #0a1021; overflow: hidden; cursor: pointer; text-align: left; transition: background .18s, transform .18s; }
-.fighter-card:last-child { border: 0; }
+.roster-grid { display: grid; grid-template-columns: repeat(8, 1fr); }
+.fighter-card { min-width: 0; height: 190px; position: relative; border: 0; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: #0a1021; overflow: hidden; cursor: pointer; text-align: left; transition: background .18s, transform .18s; }
+.fighter-card:nth-child(8n) { border-right: 0; }
+.fighter-card:nth-child(n+9) { border-bottom: 0; }
 .fighter-card:hover { background: color-mix(in srgb, var(--fighter) 13%, #0a1021); transform: translateY(-4px); }
 .fighter-card.is-selected { background: linear-gradient(145deg, color-mix(in srgb, var(--fighter) 34%, #091326), #091326); box-shadow: inset 0 -4px var(--fighter); }
 .fighter-card.is-rival::after { content: "CPU"; position: absolute; top: 8px; right: 7px; color: var(--fighter); font-size: 7px; font-weight: 950; letter-spacing: .1em; }
 .fighter-number { position: absolute; top: 8px; left: 8px; color: #596a86; font-size: 8px; }
-.portrait-mark { display: block; color: var(--fighter); font-size: 79px; font-weight: 950; font-style: italic; line-height: 1; transform: translate(12px, 23px); opacity: .68; text-shadow: 12px 0 0 color-mix(in srgb, var(--fighter-2) 40%, transparent); }
+.fighter-portrait.compact { position: absolute; inset: 0; height: 100%; background-color: #080d1b; opacity: .88; transition: transform .2s, filter .2s; }
+.fighter-card:hover .fighter-portrait.compact, .fighter-card.is-selected .fighter-portrait.compact { transform: scale(1.06); filter: saturate(1.25) brightness(1.08); }
+.fighter-card::before { content: ""; position: absolute; z-index: 1; inset: 42% 0 0; background: linear-gradient(transparent, #050812 76%); pointer-events: none; }
 .fighter-card-copy { position: absolute; left: 9px; bottom: 9px; display: grid; }
+.fighter-card-copy, .fighter-number { z-index: 2; }
 .fighter-card-copy strong { font-size: 12px; font-style: italic; letter-spacing: -.03em; }
 .fighter-card-copy small { color: #8392aa; font-size: 7px; letter-spacing: .12em; text-transform: uppercase; margin-top: 2px; }
 
@@ -168,10 +181,10 @@ footer p { color: #7e8fa7; }
   .versus-preview { min-height: 450px; }
   .hero-mark { flex-basis: 40%; }
   .fighter-copy { padding-inline: 18px; }
-  .roster-grid { grid-template-columns: repeat(5, 1fr); }
+  .roster-grid { grid-template-columns: repeat(4, 1fr); }
   .fighter-card { border-bottom: 1px solid var(--line); }
-  .fighter-card:nth-child(5n) { border-right: 0; }
-  .fighter-card:nth-child(n+6) { border-bottom: 0; }
+  .fighter-card:nth-child(4n) { border-right: 0; }
+  .fighter-card:nth-child(n+13) { border-bottom: 0; }
   .keyboard-map { grid-template-columns: repeat(4, auto); }
 }
 
@@ -187,16 +200,14 @@ footer p { color: #7e8fa7; }
   .fighter-panel { align-items: stretch; flex-direction: column; }
   .fighter-panel.cpu { flex-direction: column; }
   .hero-mark { flex: 0 0 48%; min-height: 160px; }
-  .hero-mark span { font-size: 120px; }
   .fighter-copy, .cpu .fighter-copy { text-align: left; padding: 10px 12px 20px; }
   .fighter-copy h2 { font-size: 38px; }
-  .fighter-copy blockquote, .stat-row { display: none; }
+  .fighter-copy blockquote, .stat-row, .personality-card { display: none; }
   .special-tag { margin-top: 15px; }
   .roster-grid { grid-template-columns: repeat(2, 1fr); }
   .fighter-card { height: 100px; border-bottom: 1px solid var(--line) !important; }
   .fighter-card:nth-child(2n) { border-right: 0; }
-  .fighter-card:nth-child(n+9) { border-bottom: 0 !important; }
-  .portrait-mark { font-size: 58px; transform: translate(12px, 18px); }
+  .fighter-card:nth-child(n+15) { border-bottom: 0 !important; }
   .stage-grid { grid-template-columns: repeat(2, 1fr); }
   .stage-grid button { border-bottom: 1px solid var(--line) !important; border-right: 1px solid var(--line) !important; }
   .stage-grid button:nth-child(2n) { border-right: 0 !important; }

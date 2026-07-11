@@ -30,6 +30,13 @@ test("declares the requested keyboard controls and signature combos", async () =
   }
   assert.match(source, /SOLAR CHAIN/);
   assert.match(source, /TIDAL FORM/);
+  assert.match(source, /AXIOM-7/);
+  assert.match(source, /MOSS COLOSSUS/);
+  assert.match(source, /12-year-old junior inventor/);
+  assert.match(source, /13-year-old skating champion/);
+  assert.match(source, /14-year-old academy champion/);
+  assert.match(source, /TIPSY SAGE/);
+  assert.match(source, /CINEMATIC FINISH/);
 });
 
 test("includes persistent two-player rooms and spectator APIs", async () => {

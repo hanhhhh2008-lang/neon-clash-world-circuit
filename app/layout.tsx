@@ -23,11 +23,11 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     metadataBase,
     title: "Neon Clash — World Circuit",
-    description: "Choose from ten original fighters, master unique combos, battle adaptive AI, or enter public two-player rooms with live spectators.",
+    description: "Choose from sixteen original human, youth, robot, monster, and elder fighters, master cinematic combos, battle adaptive AI, or enter public rooms.",
     icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
     openGraph: {
       title: "Neon Clash — World Circuit",
-      description: "Ten fighters, public online rooms, live spectators, and one world circuit.",
+      description: "Sixteen distinctive fighters, public online rooms, live spectators, and one world circuit.",
       type: "website",
       images: [{ url: socialImage, width: 1200, height: 630, alt: "Neon Clash World Circuit" }],
     },
