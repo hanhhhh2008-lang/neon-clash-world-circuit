@@ -372,6 +372,9 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
     const spriteCache = new Map<string, HTMLCanvasElement>();
     const spritePoses: SpritePose[] = ["idle", "punch", "kick", "special", "guard", "hurt"];
     for (const f of [player, cpu]) for (const pose of spritePoses) spriteCache.set(`${f.id}:${pose}`, buildSprite(f, outfit, pose));
+    const artSheets: Record<"main" | "bonus", HTMLImageElement> = { main: new Image(), bonus: new Image() };
+    artSheets.main.src = "/characters/neon-clash-roster-concept.webp";
+    artSheets.bonus.src = "/characters/neon-clash-bonus-roster-concept.webp";
 
     const p1 = createCombatant(player, 350, 1);
     const p2 = createCombatant(cpu, 930, -1);
@@ -601,9 +604,30 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       ctx.save(); ctx.translate(c.x + c.facing * reach, c.y + bob); ctx.scale(c.facing, 1);
       if (c.guarding) { ctx.globalAlpha = 0.42; ctx.strokeStyle = c.fighter.color; ctx.lineWidth = 10; ctx.beginPath(); ctx.arc(6, -125, 88, -1.25, 1.25); ctx.stroke(); ctx.globalAlpha = 1; }
       if (c.evadeTime > 0) ctx.globalAlpha = 0.42;
-      if (c.attack === "super") { for (let trail = 3; trail > 0; trail--) { ctx.globalAlpha = 0.1 * trail; ctx.drawImage(sprite, -112 - trail * 24, -300, 224, 300); } ctx.globalAlpha = 1; }
       if (c.flashTime > 0) ctx.globalCompositeOperation = "screen";
-      ctx.drawImage(sprite, -112, c.crouching ? -250 : -300, 224, c.crouching ? 250 : 300);
+      const sheet = artSheets[c.fighter.portrait.sheet];
+      if (sheet.complete && sheet.naturalWidth > 0) {
+        const total = c.fighter.portrait.sheet === "main" ? 10 : 6;
+        const slotWidth = sheet.naturalWidth / total;
+        const sourceWidth = slotWidth * 0.88;
+        const sourceX = slotWidth * c.fighter.portrait.index + (slotWidth - sourceWidth) / 2;
+        const height = c.crouching ? 286 : c.fighter.kind === "monster" ? 390 : c.fighter.kind === "youth" ? 318 : 360;
+        const width = c.fighter.kind === "monster" ? 190 : c.fighter.kind === "robot" ? 126 : c.fighter.kind === "youth" ? 118 : c.fighter.kind === "elder" ? 144 : ["Grappler", "Armor"].includes(c.fighter.style) ? 158 : 138;
+        const attackLean = pose === "punch" ? -0.055 : pose === "kick" ? 0.075 : pose === "hurt" ? -0.11 : 0;
+        const attackShift = pose === "punch" ? 26 : pose === "kick" ? 18 : pose === "special" ? 14 : 0;
+        ctx.save();
+        ctx.translate(attackShift, 0); ctx.rotate(attackLean);
+        if (pose === "special") { ctx.translate(0, -8); ctx.scale(1.08, 1.08); }
+        ctx.globalCompositeOperation = "screen";
+        ctx.filter = `contrast(1.14) saturate(1.18) drop-shadow(0 8px 5px #03050c) drop-shadow(0 0 12px ${c.fighter.color})`;
+        if (c.attack === "super") { ctx.globalAlpha = 0.34; ctx.strokeStyle = c.fighter.color; ctx.lineWidth = 12; ctx.beginPath(); ctx.ellipse(0, -height * 0.52, width * 0.72, height * 0.52, 0, 0, Math.PI * 2); ctx.stroke(); }
+        ctx.globalAlpha = c.evadeTime > 0 ? 0.52 : 1;
+        ctx.drawImage(sheet, sourceX, 0, sourceWidth, sheet.naturalHeight, -width / 2, -height, width, height);
+        ctx.restore();
+      } else {
+        if (c.attack === "super") { for (let trail = 3; trail > 0; trail--) { ctx.globalAlpha = 0.1 * trail; ctx.drawImage(sprite, -112 - trail * 24, -300, 224, 300); } ctx.globalAlpha = 1; }
+        ctx.drawImage(sprite, -112, c.crouching ? -250 : -300, 224, c.crouching ? 250 : 300);
+      }
       ctx.restore();
       if (c.combo > 1) { ctx.fillStyle = c.fighter.color; ctx.font = "900 22px Arial"; ctx.textAlign = "center"; ctx.fillText(`${c.combo} HIT`, c.x, c.y - 330); }
     };
