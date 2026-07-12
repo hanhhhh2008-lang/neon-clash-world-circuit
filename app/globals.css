@@ -117,11 +117,15 @@ button { color: inherit; }
 .broadcast-strip strong { margin-left: auto; margin-right: 18px; color: var(--cyan); }
 .arena-wrap { position: relative; border: 1px solid var(--line); background: #050712; overflow: hidden; }
 .arena-wrap canvas { display: block; width: 100%; height: auto; aspect-ratio: 16/9; touch-action: none; }
-.control-deck { min-height: 76px; border: 1px solid var(--line); border-top: 0; background: #080d1b; display: flex; align-items: center; padding: 12px 14px; gap: 20px; }
-.keyboard-map { display: grid; grid-template-columns: repeat(8, auto); gap: 12px; }
+.control-deck { min-height: 96px; border: 1px solid var(--line); border-top: 0; background: #080d1b; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto; align-items: center; padding: 12px 14px; gap: 20px; }
+.keyboard-map { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 8px 12px; }
 .keyboard-map > div { display: flex; align-items: center; gap: 6px; }
 kbd { min-width: 31px; padding: 7px 6px; text-align: center; background: #10182b; border: 1px solid #35435e; border-bottom-width: 3px; color: var(--ice); font: 800 9px Arial; }
 .keyboard-map span { color: #6f7f99; font-size: 7px; letter-spacing: .09em; }
+.command-map { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 7px 12px; padding-left: 18px; border-left: 1px solid var(--line); }
+.command-map > div { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.command-map kbd { min-width: 94px; color: var(--acid); font-size: 8px; font-weight: 900; letter-spacing: .04em; }
+.command-map span { color: #8798b5; font-size: 7px; letter-spacing: .08em; }
 .menu-button { margin-left: auto; border: 1px solid #35435e; background: transparent; padding: 11px 14px; color: #a5b4cb; font-size: 8px; letter-spacing: .12em; cursor: pointer; }
 .menu-button:hover { color: var(--cyan); border-color: var(--cyan); }
 .touch-controls { position: absolute; inset: auto 0 10px; padding: 0 10px; justify-content: space-between; pointer-events: none; display: none; }

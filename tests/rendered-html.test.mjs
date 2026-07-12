@@ -21,9 +21,9 @@ test("declares the requested keyboard controls and signature combos", async () =
     'KeyD: "right"',
     'KeyW: "jump"',
     'KeyS: "crouch"',
-    'KeyT: "lightPunch"',
-    'KeyY: "heavyPunch"',
-    'KeyU: "lightKick"',
+    'KeyU: "lightPunch"',
+    'KeyI: "heavyPunch"',
+    'KeyJ: "lightKick"',
     'KeyK: "heavyKick"',
   ]) {
     assert.match(source, new RegExp(declaration.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
@@ -37,6 +37,10 @@ test("declares the requested keyboard controls and signature combos", async () =
   assert.match(source, /14-year-old academy champion/);
   assert.match(source, /TIPSY SAGE/);
   assert.match(source, /CINEMATIC FINISH/);
+  assert.match(source, /SIGNATURE SPECIAL/);
+  assert.match(source, /CANCEL CHAIN/);
+  assert.match(source, /actionSeq/);
+  assert.match(source, /guardMeter/);
 });
 
 test("includes persistent two-player rooms and spectator APIs", async () => {
@@ -51,7 +55,10 @@ test("includes persistent two-player rooms and spectator APIs", async () => {
   assert.match(rooms, /export async function POST/);
   assert.match(room, /role: "guest"/);
   assert.match(room, /role: "spectator"/);
+  assert.match(room, /guestOnline/);
+  assert.match(room, /staleGuest/);
   assert.match(input, /cleanInput/);
+  assert.match(input, /stale-input/);
   assert.match(state, /UPDATE rooms SET state/);
   assert.match(schema, /spectators/);
 });

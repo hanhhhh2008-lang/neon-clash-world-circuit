@@ -40,7 +40,7 @@ type Combatant = {
   grounded: boolean;
   crouching: boolean;
   guarding: boolean;
-  attack: "lightPunch" | "heavyPunch" | "lightKick" | "heavyKick" | "special" | "impact" | null;
+  attack: "lightPunch" | "heavyPunch" | "lightKick" | "heavyKick" | "special" | "impact" | "super" | null;
   attackTime: number;
   attackHit: boolean;
   hurtTime: number;
@@ -48,6 +48,8 @@ type Combatant = {
   flashTime: number;
   combo: number;
   comboWindow: number;
+  guardMeter: number;
+  evadeTime: number;
   wins: number;
 };
 
@@ -56,7 +58,8 @@ type Particle = { x: number; y: number; vx: number; vy: number; life: number; ma
 type CombatantSnapshot = Omit<Combatant, "fighter">;
 type MatchSnapshot = { p1: CombatantSnapshot; p2: CombatantSnapshot; timer: number; round: number; roundState: "intro" | "fight" | "ko" | "done"; projectiles: Array<Omit<Projectile, "owner"> & { owner: 1 | 2 }> };
 type RoomRole = "host" | "guest" | "spectator";
-type RoomSession = { id: string; token: string; role: RoomRole; players: number; spectators: number; status: string };
+type InputFrame = Record<string, boolean | number | string>;
+type RoomSession = { id: string; token: string; role: RoomRole; players: number; spectators: number; status: string; hostOnline?: boolean; guestOnline?: boolean };
 type RoomConfig = { playerId: string; cpuId: string; stageId: string; difficulty: "ROOKIE" | "PRO" | "ACE"; outfitId: string };
 type OpenRoom = { id: string; players: number; status: string; config: RoomConfig };
 
@@ -98,13 +101,14 @@ const OUTFITS: Outfit[] = [
   { id: "heatwave", name: "HEATWAVE", note: "Bold summer look", cut: "heatwave" },
 ];
 
-const CONTROL_LABELS = [["A / D", "MOVE"], ["W / S", "JUMP / SQUAT"], ["T", "LIGHT PUNCH"], ["Y", "HEAVY PUNCH"], ["U", "LIGHT KICK"], ["K", "HEAVY KICK"], ["L", "SKILL"], ["SPACE", "GUARD"]];
+const CONTROL_LABELS = [["A / D", "MOVE / BACK GUARD"], ["W / S", "JUMP / CROUCH"], ["U", "LIGHT PUNCH"], ["I", "HEAVY PUNCH"], ["J", "LIGHT KICK"], ["K", "HEAVY KICK"], ["E", "EVASIVE ROLL"], ["SPACE", "GUARD"]];
+const COMMAND_LABELS = [["↓ ↘ → + U/J", "SIGNATURE SPECIAL"], ["→ ↓ ↘ + U/I", "RISING COUNTER"], ["↓ ↘ → ×2 + I", "CINEMATIC SUPER"], ["I + K", "BLOWBACK"], ["LIGHT → HEAVY → SPECIAL", "CANCEL CHAIN"], ["L / O / P", "TRAINING SHORTCUTS"]];
 
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 function createCombatant(fighter: Fighter, x: number, facing: 1 | -1): Combatant {
-  return { fighter, x, y: 566, vx: 0, vy: 0, facing, health: 100, drive: 65, grounded: true, crouching: false, guarding: false, attack: null, attackTime: 0, attackHit: false, hurtTime: 0, stunTime: 0, flashTime: 0, combo: 0, comboWindow: 0, wins: 0 };
+  return { fighter, x, y: 566, vx: 0, vy: 0, facing, health: 100, drive: 65, grounded: true, crouching: false, guarding: false, attack: null, attackTime: 0, attackHit: false, hurtTime: 0, stunTime: 0, flashTime: 0, combo: 0, comboWindow: 0, guardMeter: 100, evadeTime: 0, wins: 0 };
 }
 
 function portraitStyle(fighter: Fighter) {
@@ -113,7 +117,7 @@ function portraitStyle(fighter: Fighter) {
 
 function portraitCropStyle(fighter: Fighter) {
   const total = fighter.portrait.sheet === "main" ? 10 : 6;
-  const position = total === 1 ? 50 : fighter.portrait.index / (total - 1) * 100;
+  const position = fighter.portrait.index / (total - 1) * 100;
   const image = fighter.portrait.sheet === "main" ? "/characters/neon-clash-roster-concept.webp" : "/characters/neon-clash-bonus-roster-concept.webp";
   return { backgroundImage: `url(${image})`, backgroundPosition: `${position}% center` } as React.CSSProperties;
 }
@@ -153,7 +157,7 @@ export function NeonClash() {
   const cpu = useMemo(() => FIGHTERS.find((f) => f.id === cpuId) ?? FIGHTERS[1], [cpuId]);
   const stage = useMemo(() => STAGES.find((s) => s.id === stageId) ?? STAGES[0], [stageId]);
   const outfit = useMemo(() => OUTFITS.find((s) => s.id === outfitId) ?? OUTFITS[0], [outfitId]);
-  const remoteInputRef = useRef<Record<string, boolean>>({});
+  const remoteInputRef = useRef<InputFrame>({});
   const remoteStateRef = useRef<MatchSnapshot | null>(null);
   const roomRef = useRef<RoomSession | null>(null);
   const lastStatePush = useRef(0);
@@ -190,11 +194,11 @@ export function NeonClash() {
         if (!active || !response.ok) return;
         remoteInputRef.current = data.room.guestInput ?? {};
         if (room.role !== "host" && data.room.state && Object.keys(data.room.state).length) remoteStateRef.current = data.room.state;
-        setRoom((current) => current ? { ...current, players: data.room.players, spectators: data.room.spectators, status: data.room.status } : current);
+        setRoom((current) => current ? { ...current, players: data.room.players, spectators: data.room.spectators, status: data.room.status, hostOnline: data.room.hostOnline, guestOnline: data.room.guestOnline } : current);
         if (room.role !== "host" && data.room.status === "fighting") { setLobbyOpen(false); setScreen("fight"); }
       } catch { if (active) setRoomError("ROOM CONNECTION INTERRUPTED — RETRYING"); }
     };
-    void poll(); const interval = window.setInterval(poll, room.role === "spectator" ? 140 : 90);
+    void poll(); const interval = window.setInterval(poll, room.role === "spectator" ? 120 : 55);
     return () => { active = false; window.clearInterval(interval); };
   }, [room?.id, room?.role, room?.token]);
 
@@ -221,14 +225,14 @@ export function NeonClash() {
     finally { setRoomBusy(false); }
   };
 
-  const sendInput = useCallback((value: Record<string, boolean>) => {
+  const sendInput = useCallback((value: InputFrame) => {
     const session = roomRef.current; if (!session || session.role !== "guest") return;
     void fetch(`/api/rooms/${session.id}/input`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: session.token, input: value }) });
   }, []);
 
   const publishSnapshot = useCallback((snapshot: MatchSnapshot) => {
     const session = roomRef.current; const now = performance.now();
-    if (!session || session.role !== "host" || now - lastStatePush.current < 70) return;
+    if (!session || session.role !== "host" || now - lastStatePush.current < 45) return;
     lastStatePush.current = now;
     void fetch(`/api/rooms/${session.id}/state`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: session.token, state: snapshot, status: snapshot.roundState === "done" ? "complete" : "fighting" }) });
   }, []);
@@ -299,6 +303,9 @@ export function NeonClash() {
             <div className="keyboard-map">
               {CONTROL_LABELS.map(([key, action]) => <div key={action}><kbd>{key}</kbd><span>{action}</span></div>)}
             </div>
+            <div className="command-map" aria-label="Motion commands">
+              {COMMAND_LABELS.map(([command, action]) => <div key={action}><kbd>{command}</kbd><span>{action}</span></div>)}
+            </div>
             <button className="menu-button" onClick={() => setScreen("select")}>← FIGHTER SELECT</button>
           </div>
           {outcome && <div className="result-modal"><p>MATCH COMPLETE</p><h2>{outcome}</h2><div><button onClick={() => { setOutcome(null); setMatchKey((k) => k + 1); }}>REMATCH</button><button onClick={() => setScreen("select")}>CHANGE FIGHTER</button></div></div>}
@@ -315,7 +322,7 @@ export function NeonClash() {
 function RoomLobby({ room, code, setCode, busy, error, openRooms, createRoom, joinRoom, startFight, close }: { room: RoomSession | null; code: string; setCode: (value: string) => void; busy: boolean; error: string; openRooms: OpenRoom[]; createRoom: () => void; joinRoom: (watchOnly?: boolean, code?: string) => void; startFight: () => void; close: () => void }) {
   const share = () => { const url = `${window.location.origin}${window.location.pathname}?room=${room?.id ?? code}`; void navigator.clipboard.writeText(url); };
   const email = () => { const url = `${window.location.origin}${window.location.pathname}?room=${room?.id ?? code}`; window.location.href = `mailto:?subject=${encodeURIComponent("Join my Neon Clash room")}&body=${encodeURIComponent(`Room ${room?.id ?? code}: ${url}`)}`; };
-  return <div className="online-backdrop"><section className="online-lobby"><button className="close-lobby" onClick={close}>×</button><p className="eyebrow">PUBLIC MATCHMAKING // LIVE SPECTATORS</p><h2>{room ? `ROOM ${room.id}` : "ENTER THE LOBBY"}</h2><p className="lobby-copy">Every room has exactly two fighter slots. Anyone who joins after both slots are filled enters as a live spectator.</p>{room ? <div className="room-console"><div className="slot-row"><span className="filled">P1<br /><b>HOST</b></span><i>VS</i><span className={room.players === 2 ? "filled" : "waiting"}>P2<br /><b>{room.players === 2 ? "READY" : "WAITING"}</b></span></div><div className="room-metrics"><span>{room.players}/2 PLAYERS</span><span>{room.spectators} WATCHING</span><span>{room.status.toUpperCase()}</span></div><div className="room-actions"><button onClick={share}>COPY ROOM LINK</button><button onClick={email}>EMAIL INVITE</button>{room.role === "host" && <button className="primary" disabled={room.players < 2} onClick={startFight}>{room.players < 2 ? "WAITING FOR P2" : "START MATCH"}</button>}{room.role !== "host" && <button className="primary" disabled>{room.role === "spectator" ? "WATCHING ROOM" : "WAITING FOR HOST"}</button>}</div></div> : <div className="lobby-grid"><div><b>CREATE A ROOM</b><span>Your selected fighters, arena, difficulty, and outfits become the room setup.</span><button className="primary" disabled={busy} onClick={createRoom}>CREATE PUBLIC ROOM</button></div><div><b>JOIN OR WATCH</b><input value={code} onChange={(event) => setCode(event.target.value.toUpperCase().slice(0, 6))} aria-label="Room code" placeholder="6-DIGIT ROOM CODE" /><button disabled={busy || code.length !== 6} onClick={() => joinRoom(false)}>JOIN ROOM</button><button disabled={busy || code.length !== 6} onClick={() => joinRoom(true)}>WATCH ONLY</button></div></div>}{error && <strong className="connection-state failed">{error}</strong>}{!room && openRooms.length > 0 && <div className="open-room-list"><b>OPEN ROOMS</b>{openRooms.map((item) => <div key={item.id}><span><strong>{item.id}</strong><small>{item.players}/2 · {item.status.toUpperCase()}</small></span><button onClick={() => joinRoom(false, item.id)}>{item.players < 2 ? "JOIN" : "WATCH"}</button></div>)}</div>}</section></div>;
+  return <div className="online-backdrop"><section className="online-lobby"><button className="close-lobby" onClick={close}>×</button><p className="eyebrow">CROSS-COMPUTER MATCHMAKING // LIVE SPECTATORS</p><h2>{room ? `ROOM ${room.id}` : "ENTER THE LOBBY"}</h2><p className="lobby-copy">Create a room, copy its link, and open it on a second computer. The host runs the match while both players send live keyboard input.</p>{room ? <div className="room-console"><div className="slot-row"><span className={room.hostOnline === false ? "waiting" : "filled"}>P1<br /><b>{room.hostOnline === false ? "OFFLINE" : "HOST"}</b></span><i>VS</i><span className={room.players === 2 ? "filled" : "waiting"}>P2<br /><b>{room.players === 2 ? "CONNECTED" : "WAITING"}</b></span></div><div className="room-metrics"><span>{room.players}/2 PLAYERS</span><span>{room.spectators} WATCHING</span><span>{room.status.toUpperCase()}</span></div><div className="room-actions"><button onClick={share}>COPY INVITE LINK</button><button onClick={email}>EMAIL INVITE</button>{room.role === "host" && <button className="primary" disabled={room.players < 2} onClick={startFight}>{room.players < 2 ? "WAITING FOR P2" : "START MATCH"}</button>}{room.role !== "host" && <button className="primary" disabled>{room.role === "spectator" ? "WATCHING ROOM" : room.hostOnline === false ? "HOST DISCONNECTED" : "WAITING FOR HOST"}</button>}</div></div> : <div className="lobby-grid"><div><b>HOST ON THIS COMPUTER</b><span>Create a six-character room and share the link with Player 2.</span><button className="primary" disabled={busy} onClick={createRoom}>CREATE TWO-PLAYER ROOM</button></div><div><b>JOIN FROM ANOTHER COMPUTER</b><input value={code} onChange={(event) => setCode(event.target.value.toUpperCase().slice(0, 6))} aria-label="Room code" placeholder="6-DIGIT ROOM CODE" /><button disabled={busy || code.length !== 6} onClick={() => joinRoom(false)}>JOIN AS PLAYER 2</button><button disabled={busy || code.length !== 6} onClick={() => joinRoom(true)}>WATCH ONLY</button></div></div>}{error && <strong className="connection-state failed">{error}</strong>}{!room && openRooms.length > 0 && <div className="open-room-list"><b>OPEN ROOMS</b>{openRooms.map((item) => <div key={item.id}><span><strong>{item.id}</strong><small>{item.players}/2 · {item.status.toUpperCase()}</small></span><button onClick={() => joinRoom(false, item.id)}>{item.players < 2 ? "JOIN" : "WATCH"}</button></div>)}</div>}</section></div>;
 }
 
 function FighterPanel({ fighter, outfit, side }: { fighter: Fighter; outfit: Outfit; side: "player" | "cpu" }) {
@@ -339,9 +346,9 @@ function Stat({ label, value }: { label: string; value: number }) {
   return <div><span>{label}</span><i><b style={{ width: `${value * 10}%` }} /></i><em>{value}</em></div>;
 }
 
-function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remoteInputRef, remoteStateRef, sendInput, onSnapshot, onMatchEnd }: { player: Fighter; cpu: Fighter; stage: Stage; outfit: Outfit; difficulty: "ROOKIE" | "PRO" | "ACE"; mode: "CPU" | "ONLINE"; role: RoomRole; remoteInputRef: React.RefObject<Record<string, boolean>>; remoteStateRef: React.RefObject<MatchSnapshot | null>; sendInput: (value: Record<string, boolean>) => void; onSnapshot: (value: MatchSnapshot) => void; onMatchEnd: (value: string) => void }) {
+function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remoteInputRef, remoteStateRef, sendInput, onSnapshot, onMatchEnd }: { player: Fighter; cpu: Fighter; stage: Stage; outfit: Outfit; difficulty: "ROOKIE" | "PRO" | "ACE"; mode: "CPU" | "ONLINE"; role: RoomRole; remoteInputRef: React.RefObject<InputFrame>; remoteStateRef: React.RefObject<MatchSnapshot | null>; sendInput: (value: InputFrame) => void; onSnapshot: (value: MatchSnapshot) => void; onMatchEnd: (value: string) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const inputRef = useRef<Record<string, boolean>>({});
+  const inputRef = useRef<InputFrame>({ actionSeq: 0, action: "" });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -386,6 +393,9 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
     const particleCap = lowPower || reduceMotion ? 36 : 90;
     const aiRate = difficulty === "ROOKIE" ? 0.56 : difficulty === "PRO" ? 0.33 : 0.19;
     const inputHistory: Array<{ key: string; at: number }> = [];
+    const directionHistory: Array<{ key: string; at: number }> = [];
+    const previousWants = new Map<Combatant, Record<string, boolean>>([[p1, {}], [p2, {}]]);
+    let lastRemoteActionSeq = -1;
     let comboBonus = 0;
     let comboCallout = 0;
     let finisherTime = 0;
@@ -407,6 +417,7 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       target.health = value.health; target.drive = value.drive; target.grounded = value.grounded; target.crouching = value.crouching; target.guarding = value.guarding;
       target.attack = value.attack; target.attackTime = value.attackTime; target.attackHit = value.attackHit; target.hurtTime = value.hurtTime; target.stunTime = value.stunTime;
       target.flashTime = value.flashTime; target.combo = value.combo; target.comboWindow = value.comboWindow; target.wins = value.wins;
+      target.guardMeter = value.guardMeter ?? 100; target.evadeTime = value.evadeTime ?? 0;
     };
 
     const applyRemoteSnapshot = () => {
@@ -416,7 +427,7 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       for (const item of snapshot.projectiles ?? []) projectiles.push({ ...item, owner: item.owner === 1 ? p1 : p2 });
     };
 
-    const combatantSnapshot = (value: Combatant): CombatantSnapshot => ({ x: value.x, y: value.y, vx: value.vx, vy: value.vy, facing: value.facing, health: value.health, drive: value.drive, grounded: value.grounded, crouching: value.crouching, guarding: value.guarding, attack: value.attack, attackTime: value.attackTime, attackHit: value.attackHit, hurtTime: value.hurtTime, stunTime: value.stunTime, flashTime: value.flashTime, combo: value.combo, comboWindow: value.comboWindow, wins: value.wins });
+    const combatantSnapshot = (value: Combatant): CombatantSnapshot => ({ x: value.x, y: value.y, vx: value.vx, vy: value.vy, facing: value.facing, health: value.health, drive: value.drive, grounded: value.grounded, crouching: value.crouching, guarding: value.guarding, attack: value.attack, attackTime: value.attackTime, attackHit: value.attackHit, hurtTime: value.hurtTime, stunTime: value.stunTime, flashTime: value.flashTime, combo: value.combo, comboWindow: value.comboWindow, guardMeter: value.guardMeter, evadeTime: value.evadeTime, wins: value.wins });
 
     const snapshot = (): MatchSnapshot => ({ p1: combatantSnapshot(p1), p2: combatantSnapshot(p2), timer, round, roundState, projectiles: projectiles.map((item) => ({ x: item.x, y: item.y, vx: item.vx, life: item.life, color: item.color, damage: item.damage, owner: item.owner === p1 ? 1 : 2 })) });
 
@@ -429,22 +440,22 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       }
     };
 
-    const startAttack = (c: Combatant, type: Combatant["attack"]) => {
-      if (!type || c.attack || c.hurtTime > 0 || c.stunTime > 0 || roundState !== "fight") return;
-      const costs = { lightPunch: 0, heavyPunch: 0, lightKick: 0, heavyKick: 0, special: 25, impact: 32 };
+    const startAttack = (c: Combatant, type: Combatant["attack"], cancel = false) => {
+      if (!type || (!cancel && c.attack) || c.hurtTime > 0 || c.stunTime > 0 || c.evadeTime > 0 || roundState !== "fight") return;
+      const costs = { lightPunch: 0, heavyPunch: 0, lightKick: 0, heavyKick: 0, special: 25, impact: 32, super: 65 };
       if (c.drive < costs[type]) return;
       c.drive -= costs[type]; c.attack = type; c.attackTime = 0; c.attackHit = false; c.guarding = false;
-      if (type === "special") {
-        burst(c.x + c.facing * 58, c.y - 126, c.fighter.color, c === p1 && comboBonus > 0 ? 34 : 14);
-        if (c === p1 && comboBonus > 0) { finisherTime = 1.15; finisherName = c.fighter.ultimate; finisherColor = c.fighter.color; shake = 16; }
+      if (type === "special" || type === "super") {
+        burst(c.x + c.facing * 58, c.y - 126, c.fighter.color, type === "super" ? 46 : c === p1 && comboBonus > 0 ? 34 : 14);
+        if (type === "super" || (c === p1 && comboBonus > 0)) { finisherTime = type === "super" ? 1.55 : 1.15; finisherName = c.fighter.ultimate; finisherColor = c.fighter.color; shake = type === "super" ? 23 : 16; }
       }
-      if (type === "special" && (c.fighter.style === "Zoner" || c.fighter.style === "Control")) {
-        projectiles.push({ x: c.x + c.facing * 70, y: c.y - 116, vx: c.facing * (520 + c.fighter.reach * 10), life: 1.8, owner: c, color: c.fighter.color, damage: 13 + c.fighter.power * 0.45 + (c === p1 ? comboBonus : 0) });
+      if ((type === "special" || type === "super") && (c.fighter.style === "Zoner" || c.fighter.style === "Control")) {
+        projectiles.push({ x: c.x + c.facing * 70, y: c.y - 116, vx: c.facing * (type === "super" ? 720 : 520 + c.fighter.reach * 10), life: type === "super" ? 2.2 : 1.8, owner: c, color: c.fighter.color, damage: (type === "super" ? 27 : 13) + c.fighter.power * 0.45 + (c === p1 ? comboBonus : 0) });
       }
     };
 
     const hit = (attacker: Combatant, defender: Combatant, damage: number, force: number, color: string, impact = false) => {
-      if (defender.hurtTime > 0.02 || roundState !== "fight") return;
+      if (defender.hurtTime > 0.02 || defender.evadeTime > 0.06 || roundState !== "fight") return;
       const blocked = defender.guarding && defender.grounded && defender.facing === -attacker.facing;
       const dealt = blocked ? damage * 0.28 : damage;
       defender.health = clamp(defender.health - dealt, 0, 100);
@@ -452,6 +463,10 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       defender.vx = attacker.facing * force * (blocked ? 0.35 : 1);
       defender.hurtTime = blocked ? 0.12 : impact ? 0.46 : 0.24;
       defender.flashTime = 0.1;
+      if (blocked) {
+        defender.guardMeter = clamp(defender.guardMeter - damage * 2.6, 0, 100);
+        if (defender.guardMeter <= 0) { defender.guarding = false; defender.stunTime = 1.05; defender.hurtTime = 0.42; defender.guardMeter = 42; }
+      }
       if (!blocked && impact) defender.stunTime = 0.35;
       attacker.drive = clamp(attacker.drive + (blocked ? 3 : 8), 0, 100);
       attacker.combo = attacker.comboWindow > 0 ? attacker.combo + 1 : 1;
@@ -467,41 +482,46 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       heavyKick: { activeA: 0.16, activeB: 0.29, end: 0.49, range: 122, damage: 12.2, force: 315 },
       special: { activeA: 0.16, activeB: 0.32, end: 0.58, range: 138, damage: 14, force: 340 },
       impact: { activeA: 0.23, activeB: 0.39, end: 0.62, range: 126, damage: 18, force: 430 },
+      super: { activeA: 0.19, activeB: 0.48, end: 0.82, range: 178, damage: 28, force: 510 },
     }[type]);
 
     const updateCombatant = (c: Combatant, foe: Combatant, move: number, wants: Record<string, boolean>, dt: number) => {
+      const previous = previousWants.get(c) ?? {};
+      const pressed = Object.fromEntries(Object.keys(wants).map((key) => [key, !!wants[key] && !previous[key]])) as Record<string, boolean>;
+      const requestedAttack = (): Combatant["attack"] => pressed.super ? "super" : pressed.impact ? "impact" : pressed.special ? "special" : pressed.heavyKick ? "heavyKick" : pressed.heavyPunch ? "heavyPunch" : pressed.lightKick ? "lightKick" : pressed.lightPunch ? "lightPunch" : null;
       c.facing = c.x < foe.x ? 1 : -1;
       c.hurtTime = Math.max(0, c.hurtTime - dt); c.stunTime = Math.max(0, c.stunTime - dt); c.flashTime = Math.max(0, c.flashTime - dt);
+      c.evadeTime = Math.max(0, c.evadeTime - dt); c.guardMeter = clamp(c.guardMeter + dt * (c.guarding ? 1.2 : 8), 0, 100);
       c.comboWindow = Math.max(0, c.comboWindow - dt); if (c.comboWindow === 0) c.combo = 0;
       c.drive = clamp(c.drive + dt * (c.guarding ? 1.5 : 5.5), 0, 100);
       c.crouching = wants.crouch && c.grounded && !c.attack;
-      c.guarding = wants.guard && c.grounded && !c.attack && c.hurtTime <= 0;
-      if (c.hurtTime <= 0 && c.stunTime <= 0 && !c.attack && roundState === "fight") {
+      c.guarding = (wants.guard || move === -c.facing) && c.grounded && !c.attack && c.hurtTime <= 0 && c.evadeTime <= 0;
+      if (pressed.evade && c.grounded && !c.attack && c.hurtTime <= 0 && c.stunTime <= 0 && c.drive >= 10) { c.evadeTime = 0.36; c.drive -= 10; c.vx = c.facing * 520; c.guarding = false; burst(c.x, c.y - 55, c.fighter.color, 8); }
+      if (c.hurtTime <= 0 && c.stunTime <= 0 && c.evadeTime <= 0 && !c.attack && roundState === "fight") {
         const speed = (190 + c.fighter.speed * 16) * (c.crouching || c.guarding ? 0.22 : 1);
         c.vx = lerp(c.vx, move * speed, 0.26);
-        if (wants.jump && c.grounded && !c.crouching && !c.guarding) { c.vy = -(550 + c.fighter.speed * 7); c.grounded = false; }
-        if (wants.lightPunch) startAttack(c, "lightPunch");
-        else if (wants.heavyPunch) startAttack(c, "heavyPunch");
-        else if (wants.lightKick) startAttack(c, "lightKick");
-        else if (wants.heavyKick) startAttack(c, "heavyKick");
-        else if (wants.special) startAttack(c, "special");
-        else if (wants.impact) startAttack(c, "impact");
+        if (pressed.jump && c.grounded && !c.crouching && !c.guarding) { c.vy = -(550 + c.fighter.speed * 7); c.grounded = false; }
+        startAttack(c, requestedAttack());
       } else if (c.hurtTime > 0 || c.stunTime > 0) c.guarding = false;
 
       if (c.attack) {
         c.attackTime += dt;
         const data = attackData(c.attack);
-        const isProjectileSpecial = c.attack === "special" && (c.fighter.style === "Zoner" || c.fighter.style === "Control");
+        const isProjectileSpecial = (c.attack === "special" || c.attack === "super") && (c.fighter.style === "Zoner" || c.fighter.style === "Control");
         if (!c.attackHit && !isProjectileSpecial && c.attackTime >= data.activeA && c.attackTime <= data.activeB && Math.abs(c.x - foe.x) < data.range + c.fighter.reach * 2 && Math.abs(c.y - foe.y) < 105) {
-          c.attackHit = true; hit(c, foe, data.damage + c.fighter.power * 0.42 + (c === p1 && c.attack === "special" ? comboBonus : 0), data.force, c.fighter.color, c.attack === "impact");
+          c.attackHit = true; hit(c, foe, data.damage + c.fighter.power * 0.42 + (c === p1 && c.attack === "special" ? comboBonus : 0), data.force, c.fighter.color, c.attack === "impact" || c.attack === "super");
         }
-        if (c.attack === "special" && !isProjectileSpecial && c.attackTime < 0.34) c.vx += c.facing * 28;
-        if (c.attackTime >= data.end) { if (c === p1 && c.attack === "special") comboBonus = 0; c.attack = null; c.attackTime = 0; }
+        if ((c.attack === "special" || c.attack === "super") && !isProjectileSpecial && c.attackTime < 0.42) c.vx += c.facing * (c.attack === "super" ? 52 : 28);
+        const next = requestedAttack();
+        const rank = { lightPunch: 1, lightKick: 1, heavyPunch: 2, heavyKick: 2, impact: 3, special: 4, super: 5 };
+        if (next && c.attackHit && c.comboWindow > 0 && rank[next] > rank[c.attack]) startAttack(c, next, true);
+        else if (c.attackTime >= data.end) { if (c === p1 && (c.attack === "special" || c.attack === "super")) comboBonus = 0; c.attack = null; c.attackTime = 0; }
       }
 
       c.vy += 1450 * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.vx *= c.grounded ? 0.82 : 0.985;
       if (c.y >= FLOOR) { c.y = FLOOR; c.vy = 0; c.grounded = true; } else c.grounded = false;
       c.x = clamp(c.x, 82, W - 82);
+      previousWants.set(c, { ...wants });
     };
 
     const cpuWants = (dt: number) => {
@@ -515,12 +535,12 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
         else if (distance < 95) aiIntent = r < 0.18 ? "retreat" : r < 0.34 ? "guard" : r < 0.54 ? "lightPunch" : r < 0.72 ? "lightKick" : r < 0.88 ? "heavyKick" : p2.drive >= 32 ? "impact" : "jump";
         else aiIntent = r < 0.24 ? "approach" : r < 0.43 ? "jump" : r < 0.62 ? "heavyPunch" : r < 0.78 ? "heavyKick" : p2.drive >= 25 ? "special" : "lightPunch";
       }
-      return { move: aiIntent === "approach" ? p2.facing : aiIntent === "retreat" ? -p2.facing : 0, jump: aiIntent === "jump", crouch: false, guard: aiIntent === "guard", lightPunch: aiIntent === "lightPunch", heavyPunch: aiIntent === "heavyPunch", lightKick: aiIntent === "lightKick", heavyKick: aiIntent === "heavyKick", special: aiIntent === "special", impact: aiIntent === "impact" };
+      return { move: aiIntent === "approach" ? p2.facing : aiIntent === "retreat" ? -p2.facing : 0, jump: aiIntent === "jump", crouch: false, guard: aiIntent === "guard", evade: false, lightPunch: aiIntent === "lightPunch", heavyPunch: aiIntent === "heavyPunch", lightKick: aiIntent === "lightKick", heavyKick: aiIntent === "heavyKick", special: aiIntent === "special", impact: aiIntent === "impact", super: false };
     };
 
     const resetRound = () => {
-      p1.x = 350; p1.y = FLOOR; p1.vx = p1.vy = 0; p1.health = 100; p1.drive = 65; p1.attack = null; p1.hurtTime = p1.stunTime = 0;
-      p2.x = 930; p2.y = FLOOR; p2.vx = p2.vy = 0; p2.health = 100; p2.drive = 65; p2.attack = null; p2.hurtTime = p2.stunTime = 0;
+      p1.x = 350; p1.y = FLOOR; p1.vx = p1.vy = 0; p1.health = 100; p1.drive = 65; p1.guardMeter = 100; p1.evadeTime = 0; p1.attack = null; p1.hurtTime = p1.stunTime = 0;
+      p2.x = 930; p2.y = FLOOR; p2.vx = p2.vy = 0; p2.health = 100; p2.drive = 65; p2.guardMeter = 100; p2.evadeTime = 0; p2.attack = null; p2.hurtTime = p2.stunTime = 0;
       projectiles.length = 0; particles.length = 0; timer = 75; roundState = "intro"; stateTimer = 1.15;
     };
 
@@ -537,12 +557,21 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       }
 
       comboCallout = Math.max(0, comboCallout - dt); finisherTime = Math.max(0, finisherTime - dt);
-      const local = { jump: !!inputs.jump, crouch: !!inputs.crouch, guard: !!inputs.guard, lightPunch: !!inputs.lightPunch, heavyPunch: !!inputs.heavyPunch, lightKick: !!inputs.lightKick, heavyKick: !!inputs.heavyKick, special: !!inputs.special, impact: !!inputs.impact };
+      const local = { jump: !!inputs.jump, crouch: !!inputs.crouch, guard: !!inputs.guard, evade: !!inputs.evade, lightPunch: !!inputs.lightPunch, heavyPunch: !!inputs.heavyPunch, lightKick: !!inputs.lightKick, heavyKick: !!inputs.heavyKick, special: !!inputs.special, impact: !!inputs.impact, super: !!inputs.super };
       const localMove = (inputs.left ? -1 : 0) + (inputs.right ? 1 : 0);
       const remote = remoteInputRef.current ?? {};
-      const remoteWants = { move: (remote.left ? -1 : 0) + (remote.right ? 1 : 0), jump: !!remote.jump, crouch: !!remote.crouch, guard: !!remote.guard, lightPunch: !!remote.lightPunch, heavyPunch: !!remote.heavyPunch, lightKick: !!remote.lightKick, heavyKick: !!remote.heavyKick, special: !!remote.special, impact: !!remote.impact };
-      const ai = mode === "CPU" ? cpuWants(dt) : remoteWants;
-      updateCombatant(p1, p2, localMove, local, dt); updateCombatant(p2, p1, ai.move, ai, dt);
+      const remoteMove = (remote.left ? -1 : 0) + (remote.right ? 1 : 0);
+      const remoteWants: Record<string, boolean> = { jump: !!remote.jump, crouch: !!remote.crouch, guard: !!remote.guard, evade: !!remote.evade, lightPunch: false, heavyPunch: false, lightKick: false, heavyKick: false, special: false, impact: false, super: false };
+      const remoteSeq = Number(remote.actionSeq ?? -1);
+      const remoteAction = String(remote.action ?? "");
+      if (remoteSeq !== lastRemoteActionSeq && ["lightPunch", "heavyPunch", "lightKick", "heavyKick", "special", "impact", "super"].includes(remoteAction)) {
+        remoteWants[remoteAction] = true;
+        lastRemoteActionSeq = remoteSeq;
+      }
+      const ai = cpuWants(dt);
+      const { move: aiMove, ...aiWants } = ai;
+      updateCombatant(p1, p2, localMove, local, dt);
+      updateCombatant(p2, p1, mode === "CPU" ? aiMove : remoteMove, mode === "CPU" ? aiWants : remoteWants, dt);
 
       const gap = Math.abs(p1.x - p2.x);
       if (gap < 86 && Math.abs(p1.y - p2.y) < 110) { const push = (86 - gap) * 0.5; p1.x -= p1.facing * push; p2.x -= p2.facing * push; }
@@ -564,13 +593,15 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
     };
 
     const drawCombatant = (c: Combatant) => {
-      const pose: SpritePose = c.hurtTime > 0 ? "hurt" : c.guarding ? "guard" : c.attack === "lightPunch" || c.attack === "heavyPunch" || c.attack === "impact" ? "punch" : c.attack === "lightKick" || c.attack === "heavyKick" ? "kick" : c.attack === "special" ? "special" : "idle";
+      const pose: SpritePose = c.hurtTime > 0 ? "hurt" : c.guarding || c.evadeTime > 0 ? "guard" : c.attack === "lightPunch" || c.attack === "heavyPunch" || c.attack === "impact" ? "punch" : c.attack === "lightKick" || c.attack === "heavyKick" ? "kick" : c.attack === "special" || c.attack === "super" ? "special" : "idle";
       const sprite = spriteCache.get(`${c.fighter.id}:${pose}`)!;
       const attack = c.attack ? attackData(c.attack) : null;
       const reach = c.attack && attack && c.attackTime > attack.activeA * 0.75 && c.attackTime < attack.activeB ? (c.attack === "lightPunch" ? 18 : c.attack === "lightKick" ? 26 : c.attack === "impact" ? 44 : 34) : 0;
       const bob = c.grounded ? Math.sin(performance.now() * 0.004) * 2 : 0;
       ctx.save(); ctx.translate(c.x + c.facing * reach, c.y + bob); ctx.scale(c.facing, 1);
       if (c.guarding) { ctx.globalAlpha = 0.42; ctx.strokeStyle = c.fighter.color; ctx.lineWidth = 10; ctx.beginPath(); ctx.arc(6, -125, 88, -1.25, 1.25); ctx.stroke(); ctx.globalAlpha = 1; }
+      if (c.evadeTime > 0) ctx.globalAlpha = 0.42;
+      if (c.attack === "super") { for (let trail = 3; trail > 0; trail--) { ctx.globalAlpha = 0.1 * trail; ctx.drawImage(sprite, -112 - trail * 24, -300, 224, 300); } ctx.globalAlpha = 1; }
       if (c.flashTime > 0) ctx.globalCompositeOperation = "screen";
       ctx.drawImage(sprite, -112, c.crouching ? -250 : -300, 224, c.crouching ? 250 : 300);
       ctx.restore();
@@ -586,6 +617,7 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       ctx.textBaseline = "alphabetic"; ctx.fillStyle = "#effcff"; ctx.font = "900 26px Arial"; ctx.textAlign = "left"; ctx.fillText(p1.fighter.name, 50, 48); ctx.textAlign = "right"; ctx.fillText(p2.fighter.name, W - 50, 48);
       drawBar(50, 62, 455, p1.health, p1.fighter.color); drawBar(W - 505, 62, 455, p2.health, p2.fighter.color, true);
       ctx.fillStyle = "#172039"; ctx.fillRect(50, 94, 360, 9); ctx.fillRect(W - 410, 94, 360, 9); ctx.fillStyle = p1.fighter.color; ctx.fillRect(50, 94, 360 * p1.drive / 100, 9); ctx.fillStyle = p2.fighter.color; ctx.fillRect(W - 50 - 360 * p2.drive / 100, 94, 360 * p2.drive / 100, 9);
+      ctx.fillStyle = "#1c2336"; ctx.fillRect(50, 108, 250, 4); ctx.fillRect(W - 300, 108, 250, 4); ctx.fillStyle = p1.guardMeter < 35 ? "#ff405c" : "#f1f5ff"; ctx.fillRect(50, 108, 250 * p1.guardMeter / 100, 4); ctx.fillStyle = p2.guardMeter < 35 ? "#ff405c" : "#f1f5ff"; ctx.fillRect(W - 50 - 250 * p2.guardMeter / 100, 108, 250 * p2.guardMeter / 100, 4);
       ctx.fillStyle = "#f5fbff"; ctx.textAlign = "center"; ctx.font = "900 38px Arial"; ctx.fillText(String(Math.ceil(timer)).padStart(2, "0"), W / 2, 75); ctx.font = "700 12px Arial"; ctx.fillStyle = "#9ba9c5"; ctx.fillText(`ROUND ${round}`, W / 2, 96);
       for (let i = 0; i < 2; i++) { ctx.fillStyle = i < p1.wins ? p1.fighter.color : "#26304a"; ctx.beginPath(); ctx.arc(444 + i * 20, 118, 6, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = i < p2.wins ? p2.fighter.color : "#26304a"; ctx.beginPath(); ctx.arc(W - 444 - i * 20, 118, 6, 0, Math.PI * 2); ctx.fill(); }
     };
@@ -624,9 +656,49 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       draw(); if (mode === "ONLINE" && role === "host") onSnapshot(snapshot()); raf = requestAnimationFrame(loop);
     };
 
-    const keyMap: Record<string, string> = { KeyA: "left", KeyD: "right", KeyW: "jump", KeyS: "crouch", KeyT: "lightPunch", KeyY: "heavyPunch", KeyU: "lightKick", KeyK: "heavyKick", KeyL: "special", KeyO: "impact", Space: "guard" };
-    const comboKeys: Record<string, string> = { lightPunch: "T", heavyPunch: "Y", lightKick: "U", heavyKick: "K", special: "L" };
-    const onKey = (event: KeyboardEvent, down: boolean) => { const control = keyMap[event.code]; if (control && role !== "spectator") { event.preventDefault(); inputs[control] = down; if (down && !event.repeat && comboKeys[control]) recordAction(comboKeys[control]); sendInput({ ...inputs }); } };
+    const keyMap: Record<string, string> = { KeyA: "left", KeyD: "right", KeyW: "jump", KeyS: "crouch", KeyE: "evade", Space: "guard" };
+    const attackKeyMap: Record<string, NonNullable<Combatant["attack"]>> = { KeyU: "lightPunch", KeyI: "heavyPunch", KeyJ: "lightKick", KeyK: "heavyKick", KeyL: "special", KeyO: "impact", KeyP: "super" };
+    const comboKeys: Record<string, string> = { lightPunch: "T", heavyPunch: "Y", lightKick: "U", heavyKick: "K", special: "L", impact: "Y", super: "L" };
+    const direction = () => inputs.crouch ? inputs.left ? "DFL" : inputs.right ? "DFR" : "D" : inputs.left ? "L" : inputs.right ? "R" : "N";
+    const recordDirection = () => {
+      const now = performance.now(), key = direction();
+      while (directionHistory[0] && now - directionHistory[0].at > 950) directionHistory.shift();
+      if (key !== "N" && directionHistory.at(-1)?.key !== key) directionHistory.push({ key, at: now });
+    };
+    const hasMotion = (sequence: string[]) => {
+      const tail = directionHistory.slice(-sequence.length);
+      return tail.length === sequence.length && tail.every((item, index) => item.key === sequence[index]) && tail.at(-1)!.at - tail[0].at <= 850;
+    };
+    const resolveCommand = (base: NonNullable<Combatant["attack"]>) => {
+      const qcfRight = hasMotion(["D", "DFR", "R"]), qcfLeft = hasMotion(["D", "DFL", "L"]);
+      const superRight = hasMotion(["D", "DFR", "R", "D", "DFR", "R"]), superLeft = hasMotion(["D", "DFL", "L", "D", "DFL", "L"]);
+      const dp = hasMotion(["R", "D", "DFR"]) || hasMotion(["L", "D", "DFL"]);
+      if ((base === "heavyPunch" || base === "heavyKick") && (superRight || superLeft)) return "super" as const;
+      if ((base === "lightPunch" || base === "heavyPunch") && dp) return "impact" as const;
+      if (["lightPunch", "heavyPunch", "lightKick", "heavyKick"].includes(base) && (qcfRight || qcfLeft)) return "special" as const;
+      if ((base === "heavyPunch" && !!inputs.heavyKick) || (base === "heavyKick" && !!inputs.heavyPunch)) return "impact" as const;
+      return base;
+    };
+    const pulseAction = (action: NonNullable<Combatant["attack"]>) => {
+      inputs[action] = true;
+      inputs.actionSeq = Number(inputs.actionSeq ?? 0) + 1;
+      inputs.action = action;
+      if (comboKeys[action]) recordAction(comboKeys[action]);
+      sendInput({ ...inputs });
+      window.setTimeout(() => { inputs[action] = false; sendInput({ ...inputs }); }, 72);
+    };
+    const onKey = (event: KeyboardEvent, down: boolean) => {
+      if (role === "spectator") return;
+      const control = keyMap[event.code];
+      const attack = attackKeyMap[event.code];
+      if (!control && !attack) return;
+      event.preventDefault();
+      if (control) {
+        inputs[control] = down;
+        if (["left", "right", "crouch"].includes(control)) recordDirection();
+        sendInput({ ...inputs });
+      } else if (down && !event.repeat && attack) pulseAction(resolveCommand(attack));
+    };
     const keyDown = (e: KeyboardEvent) => onKey(e, true), keyUp = (e: KeyboardEvent) => onKey(e, false);
     window.addEventListener("keydown", keyDown, { passive: false }); window.addEventListener("keyup", keyUp, { passive: false });
     const visibility = () => { last = performance.now(); accumulator = 0; };
@@ -635,15 +707,22 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
     return () => { running = false; cancelAnimationFrame(raf); window.removeEventListener("keydown", keyDown); window.removeEventListener("keyup", keyUp); document.removeEventListener("visibilitychange", visibility); };
   }, [cpu, difficulty, mode, onMatchEnd, onSnapshot, outfit, player, remoteInputRef, remoteStateRef, role, sendInput, stage]);
 
-  const setControl = (control: string, value: boolean) => { inputRef.current[control] = value; sendInput({ ...inputRef.current }); };
+  const setControl = (control: string, value: boolean) => {
+    inputRef.current[control] = value;
+    if (value && ["lightPunch", "heavyPunch", "lightKick", "heavyKick", "special", "impact", "super"].includes(control)) {
+      inputRef.current.actionSeq = Number(inputRef.current.actionSeq ?? 0) + 1;
+      inputRef.current.action = control;
+    }
+    sendInput({ ...inputRef.current });
+  };
 
   return (
     <div className="arena-wrap">
       <canvas ref={canvasRef} aria-label={`${player.name} versus ${cpu.name} fighting arena`} />
       {mode === "ONLINE" && <div className="room-hud">{role === "spectator" ? "● WATCHING LIVE" : role === "host" ? "P1 // HOST" : "P2 // CHALLENGER"}</div>}
       {role !== "spectator" && <div className="touch-controls" aria-label="Touch controls">
-        <div className="touch-move"><TouchButton label="◀" control="left" setControl={setControl} /><TouchButton label="▲" control="jump" setControl={setControl} /><TouchButton label="▼" control="crouch" setControl={setControl} /><TouchButton label="▶" control="right" setControl={setControl} /></div>
-        <div className="touch-action"><TouchButton label="T" control="lightPunch" setControl={setControl} /><TouchButton label="Y" control="heavyPunch" setControl={setControl} /><TouchButton label="U" control="lightKick" setControl={setControl} /><TouchButton label="K" control="heavyKick" setControl={setControl} /><TouchButton label="L" control="special" setControl={setControl} /><TouchButton label="GD" control="guard" setControl={setControl} /></div>
+        <div className="touch-move"><TouchButton label="◀" control="left" setControl={setControl} /><TouchButton label="▲" control="jump" setControl={setControl} /><TouchButton label="▼" control="crouch" setControl={setControl} /><TouchButton label="▶" control="right" setControl={setControl} /><TouchButton label="EV" control="evade" setControl={setControl} /></div>
+        <div className="touch-action"><TouchButton label="LP" control="lightPunch" setControl={setControl} /><TouchButton label="HP" control="heavyPunch" setControl={setControl} /><TouchButton label="LK" control="lightKick" setControl={setControl} /><TouchButton label="HK" control="heavyKick" setControl={setControl} /><TouchButton label="SP" control="special" setControl={setControl} /><TouchButton label="GD" control="guard" setControl={setControl} /></div>
       </div>}
     </div>
   );
@@ -725,7 +804,8 @@ function buildSprite(fighter: Fighter, outfit: Outfit, pose: SpritePose = "idle"
   const elder = fighter.kind === "elder";
   const scale = youth ? .82 : elder ? .92 : 1;
   const yShift = youth ? 48 : elder ? 22 : 0;
-  x.save(); x.translate(112, 292); x.scale(scale, scale); x.translate(-112, -292 + yShift);
+  const bodyScale = ["Grappler", "Armor", "Juggernaut"].includes(fighter.style) ? 1.13 : ["Aerial", "Trickster", "Skirmisher"].includes(fighter.style) ? .93 : 1;
+  x.save(); x.translate(112, 292); x.scale(scale, scale); x.translate(-112, -292 + yShift); x.translate(112, 0); x.scale(bodyScale, 1); x.translate(-112, 0);
   const skinColors: Record<string,string> = { kael:"#d7a079",zara:"#71452f",atlas:"#b77b58",nyx:"#d3a78f",rio:"#a75e3e",sable:"#d3a18b",mara:"#b96d50",batu:"#a86e4e",lux:"#e1b099",oren:"#c89472",miko:"#e7b38d",teo:"#bd7b55",jun:"#d9a481",raku:"#c58c66" };
   const skin = skinColors[fighter.id] ?? "#c98d68";
   const pants = outfit.cut === "heatwave" ? fighter.secondary : shade;
@@ -758,6 +838,14 @@ function buildSprite(fighter: Fighter, outfit: Outfit, pose: SpritePose = "idle"
   if (fighter.id === "mara") { x.fillStyle = "#f3f1e8"; x.strokeStyle = fighter.color; x.lineWidth=4; x.beginPath(); x.moveTo(82,100); x.lineTo(112,122); x.lineTo(143,100); x.lineTo(135,146); x.lineTo(88,146); x.closePath(); x.fill(); x.stroke(); }
   if (fighter.id === "lux") { x.fillStyle="rgba(255,255,255,.35)"; for(let i=0;i<4;i++){x.beginPath();x.moveTo(72+i*20,112);x.lineTo(88+i*20,134);x.lineTo(70+i*20,154);x.closePath();x.fill();} }
   if (fighter.id === "oren") { x.fillStyle="#e9f7f4"; x.fillRect(103,96,15,78); x.strokeStyle=fighter.color; x.lineWidth=4; x.beginPath(); x.moveTo(65,151); x.lineTo(157,132); x.stroke(); }
+  if (fighter.id === "kael") { const reactor=x.createRadialGradient(151,116,2,151,116,18); reactor.addColorStop(0,"#fff"); reactor.addColorStop(.35,"#ffd06b"); reactor.addColorStop(1,"#ff4b1f"); plate(151,116,18,18,reactor); }
+  if (fighter.id === "atlas") { plate(70,101,27,17,"#b67938"); plate(154,101,27,17,"#b67938"); x.strokeStyle="#f4d6a0"; x.lineWidth=5; x.beginPath(); x.moveTo(76,116); x.lineTo(112,161); x.lineTo(149,116); x.stroke(); }
+  if (fighter.id === "rio") { x.strokeStyle="#d8ff47"; x.lineWidth=9; x.beginPath(); x.moveTo(71,126); x.quadraticCurveTo(28,142,18,184); x.stroke(); }
+  if (fighter.id === "sable") { x.strokeStyle="#d62646"; x.lineWidth=10; x.beginPath(); x.moveTo(91,78); x.quadraticCurveTo(55,93,34,142); x.stroke(); x.strokeStyle="#eef4ff"; x.lineWidth=5; x.beginPath(); x.moveTo(169,154); x.lineTo(211,75); x.stroke(); }
+  if (fighter.id === "batu") { x.fillStyle="#354b68"; x.strokeStyle=outline; x.lineWidth=5; for(let i=0;i<4;i++){x.fillRect(73+i*20,103,15,58);x.strokeRect(73+i*20,103,15,58);} }
+  if (fighter.id === "teo") { x.fillStyle="#24d4c3"; x.strokeStyle=outline; x.lineWidth=5; x.beginPath(); x.roundRect(54,270,116,15,8); x.fill(); x.stroke(); x.fillStyle="#e9ffff"; x.beginPath(); x.arc(72,287,7,0,Math.PI*2); x.arc(153,287,7,0,Math.PI*2); x.fill(); }
+  if (fighter.id === "jun") { x.fillStyle="rgba(241,245,255,.82)"; for(const [px,py] of [[48,78],[180,96],[34,154]]){x.beginPath();x.moveTo(px,py);x.lineTo(px+13,py+7);x.lineTo(px+4,py+12);x.lineTo(px-6,py+7);x.closePath();x.fill();} }
+  if (fighter.id === "raku") { x.fillStyle="#b87943"; x.strokeStyle=outline; x.lineWidth=5; x.beginPath(); x.ellipse(170,154,18,26,0,0,Math.PI*2); x.fill(); x.stroke(); }
 
   plate(112,59, youth ? 27 : 33, youth ? 31 : 37, skin);
   x.fillStyle = fighter.id === "lux" ? "#e9d6c4" : fighter.id === "raku" ? "#f2f0e7" : "#151522";
@@ -770,6 +858,7 @@ function buildSprite(fighter: Fighter, outfit: Outfit, pose: SpritePose = "idle"
   else if (fighter.id === "lux") { x.fillStyle="#b65cff"; x.beginPath(); x.moveTo(84,54); x.lineTo(104,46); x.lineTo(112,58); x.lineTo(121,46); x.lineTo(141,54); x.lineTo(131,70); x.lineTo(94,70); x.closePath(); x.fill(); }
   else { x.fillStyle="#10121c"; x.fillRect(92,58,12,4); x.fillRect(121,58,12,4); }
   if (elder) { x.fillStyle="#eee7db"; x.beginPath(); x.moveTo(89,73); x.quadraticCurveTo(112,111,137,73); x.quadraticCurveTo(130,125,112,118); x.quadraticCurveTo(91,123,89,73); x.fill(); }
+  if (pose === "special") { x.globalAlpha=.58; x.strokeStyle=fighter.color; x.lineWidth=4; for(let ring=0;ring<3;ring++){x.beginPath();x.arc(112,138,64+ring*17,-1.2,1.2);x.stroke();} x.globalAlpha=1; }
   x.fillStyle = fighter.color; x.globalAlpha=.8; x.fillRect(98,116,28,7); x.globalAlpha=1;
   x.restore();
   return c;

@@ -8,7 +8,7 @@ export type RoomConfig = {
   outfitId: string;
 };
 
-const FIGHTERS = new Set(["kael", "zara", "atlas", "nyx", "rio", "sable", "mara", "batu", "lux", "oren"]);
+const FIGHTERS = new Set(["kael", "zara", "atlas", "nyx", "rio", "sable", "mara", "batu", "lux", "oren", "axiom", "cinder", "miko", "teo", "jun", "raku"]);
 const STAGES = new Set(["shibuya", "hyperrail", "stormmarket", "aegis", "voidclub", "skycourt", "solarplaza", "steppe", "prismmetro", "tidal"]);
 const OUTFITS = new Set(["circuit", "afterdark", "heatwave"]);
 
@@ -62,9 +62,17 @@ export function json(value: string | null, fallback: unknown = {}) {
 
 export function cleanInput(value: unknown) {
   const source = value && typeof value === "object" ? value as Record<string, unknown> : {};
-  const safe: Record<string, boolean> = {};
-  for (const key of ["left", "right", "jump", "crouch", "guard", "lightPunch", "heavyPunch", "lightKick", "heavyKick", "special", "impact"]) safe[key] = source[key] === true;
+  const safe: Record<string, boolean | number | string> = {};
+  for (const key of ["left", "right", "jump", "crouch", "guard", "evade"]) safe[key] = source[key] === true;
+  const action = String(source.action ?? "");
+  safe.action = ["lightPunch", "heavyPunch", "lightKick", "heavyKick", "special", "impact", "super"].includes(action) ? action : "";
+  safe.actionSeq = clampInteger(source.actionSeq, 0, 2_147_483_647);
   return safe;
+}
+
+function clampInteger(value: unknown, min: number, max: number) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.max(min, Math.min(max, Math.floor(parsed))) : min;
 }
 
 export function safeState(value: unknown) {
