@@ -4,8 +4,8 @@ export async function GET() {
   try {
     await ensureRoomSchema();
     const now = Date.now();
-    const result = await db().prepare("SELECT id, config, status, guest_token, updated_at FROM rooms WHERE updated_at > ? ORDER BY created_at DESC LIMIT 12").bind(now - 6 * 60 * 60 * 1000).all();
-    return Response.json({ rooms: result.results.map((row) => ({ id: row.id, config: json(String(row.config)), status: row.status, players: row.guest_token ? 2 : 1, updatedAt: row.updated_at })) });
+    const result = await db().prepare("SELECT id, config, status, guest_token, guest_seen, updated_at FROM rooms WHERE updated_at > ? ORDER BY created_at DESC LIMIT 12").bind(now - 6 * 60 * 60 * 1000).all();
+    return Response.json({ rooms: result.results.map((row: Record<string, unknown>) => { const guestOnline = Boolean(row.guest_token) && now - Number(row.guest_seen ?? 0) < 20_000; return { id: row.id, config: json(String(row.config)), status: guestOnline ? row.status : "waiting", players: guestOnline ? 2 : 1, updatedAt: row.updated_at }; }) });
   } catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Unable to list rooms" }, { status: 500 }); }
 }
 

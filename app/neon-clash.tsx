@@ -17,10 +17,18 @@ type Fighter = {
   reach: number;
   mark: string;
   combo: { name: string; sequence: string[] };
+  ultimate: string;
+  personality: string;
+  bio: string;
+  costume: string;
+  kind: "human" | "youth" | "robot" | "monster" | "elder";
+  portrait: { sheet: "main" | "bonus"; index: number };
 };
 
 type Stage = { id: string; name: string; city: string; descriptor: string; color: string; accent: string; motif: "skyline" | "rail" | "market" | "forge" | "club" | "court" | "plaza" | "steppe" | "metro" | "harbour" };
 type Outfit = { id: string; name: string; note: string; cut: "classic" | "sleek" | "heatwave" };
+type FighterState = "idle" | "walking" | "crouching" | "jumping" | "attacking" | "blocking" | "blockstun" | "hitstun" | "hardKnockdown" | "juggle" | "dashing" | "maxMode";
+type CombatBox = { x: number; y: number; width: number; height: number };
 
 type Combatant = {
   fighter: Fighter;
@@ -34,7 +42,7 @@ type Combatant = {
   grounded: boolean;
   crouching: boolean;
   guarding: boolean;
-  attack: "lightPunch" | "heavyPunch" | "lightKick" | "heavyKick" | "special" | "impact" | null;
+  attack: "lightPunch" | "heavyPunch" | "lightKick" | "heavyKick" | "special" | "impact" | "super" | null;
   attackTime: number;
   attackHit: boolean;
   hurtTime: number;
@@ -42,42 +50,63 @@ type Combatant = {
   flashTime: number;
   combo: number;
   comboWindow: number;
+  guardMeter: number;
+  evadeTime: number;
+  queuedAttack: Combatant["attack"];
+  queuedTime: number;
+  state: FighterState;
+  blockstunTime: number;
+  knockdownTime: number;
+  invulnTime: number;
+  dashTime: number;
+  maxModeTime: number;
+  superMeter: number;
   wins: number;
 };
 
+type ComboAttack = NonNullable<Combatant["attack"]>;
+type ComboRoute = { name: string; sequence: string[]; finisher: ComboAttack; bonus: number; drive: number };
+
 type Projectile = { x: number; y: number; vx: number; life: number; owner: Combatant; color: string; damage: number };
 type Particle = { x: number; y: number; vx: number; vy: number; life: number; maxLife: number; color: string; size: number };
-type CombatantSnapshot = Omit<Combatant, "fighter">;
-type MatchSnapshot = { p1: CombatantSnapshot; p2: CombatantSnapshot; timer: number; round: number; roundState: "intro" | "fight" | "ko" | "done"; projectiles: Array<Omit<Projectile, "owner"> & { owner: 1 | 2 }> };
+type CombatantSnapshot = Omit<Combatant, "fighter" | "queuedAttack" | "queuedTime">;
+type MatchSnapshot = { sequence?: number; p1: CombatantSnapshot; p2: CombatantSnapshot; timer: number; round: number; roundState: "intro" | "fight" | "ko" | "done"; projectiles: Array<Omit<Projectile, "owner"> & { owner: 1 | 2 }> };
 type RoomRole = "host" | "guest" | "spectator";
-type RoomSession = { id: string; token: string; role: RoomRole; players: number; spectators: number; status: string };
+type InputFrame = Record<string, boolean | number | string>;
+type RoomSession = { id: string; token: string; role: RoomRole; players: number; spectators: number; status: string; hostOnline?: boolean; guestOnline?: boolean };
 type RoomConfig = { playerId: string; cpuId: string; stageId: string; difficulty: "ROOKIE" | "PRO" | "ACE"; outfitId: string };
 type OpenRoom = { id: string; players: number; status: string; config: RoomConfig };
 
 const FIGHTERS: Fighter[] = [
-  { id: "kael", name: "KAEL", alias: "SUN BREAKER", city: "SEOUL", style: "Rushdown", special: "Solar Rift", quote: "Speed is a decision.", color: "#27f4ff", secondary: "#1768ff", speed: 9, power: 6, reach: 6, mark: "K", combo: { name: "SOLAR CHAIN", sequence: ["T", "T", "U", "L"] } },
-  { id: "zara", name: "ZARA", alias: "VOLT QUEEN", city: "LAGOS", style: "Pressure", special: "Thunder Step", quote: "Hear the storm arrive.", color: "#ff2dba", secondary: "#8a3bff", speed: 8, power: 7, reach: 5, mark: "Z", combo: { name: "VOLTAGE RUSH", sequence: ["T", "U", "Y", "L"] } },
-  { id: "atlas", name: "ATLAS", alias: "IRON SAINT", city: "ATHENS", style: "Grappler", special: "Titan Break", quote: "The ground remembers.", color: "#ff7648", secondary: "#ffb627", speed: 4, power: 10, reach: 6, mark: "A", combo: { name: "TITAN LOCK", sequence: ["Y", "K", "Y", "L"] } },
-  { id: "nyx", name: "NYX", alias: "VOID SIGNAL", city: "BERLIN", style: "Zoner", special: "Black Pulse", quote: "Distance is control.", color: "#9b6cff", secondary: "#ff2dba", speed: 6, power: 7, reach: 10, mark: "N", combo: { name: "VOID CASCADE", sequence: ["U", "T", "Y", "L"] } },
-  { id: "rio", name: "RIO", alias: "SKYLINE KID", city: "SÃO PAULO", style: "Aerial", special: "Comet Kick", quote: "Gravity is optional.", color: "#d8ff47", secondary: "#24df9b", speed: 10, power: 5, reach: 6, mark: "R", combo: { name: "COMET LADDER", sequence: ["U", "U", "K", "L"] } },
-  { id: "sable", name: "SABLE", alias: "NIGHT BLADE", city: "TOKYO", style: "Counter", special: "Zero Cut", quote: "Your move. My opening.", color: "#efefff", secondary: "#6676ff", speed: 8, power: 8, reach: 7, mark: "S", combo: { name: "ZERO VERDICT", sequence: ["T", "K", "Y", "L"] } },
-  { id: "mara", name: "MARA", alias: "RED ORBIT", city: "MEXICO CITY", style: "Balanced", special: "Meteor Arc", quote: "Burn bright. Hit hard.", color: "#ff405c", secondary: "#ff8b32", speed: 7, power: 8, reach: 7, mark: "M", combo: { name: "ORBIT BREAK", sequence: ["T", "Y", "U", "L"] } },
-  { id: "batu", name: "BATU", alias: "STEPPE WALL", city: "ULAANBAATAR", style: "Armor", special: "Stone Wake", quote: "I do not move.", color: "#41d7bf", secondary: "#2587a6", speed: 5, power: 9, reach: 5, mark: "B", combo: { name: "STEPPE QUAKE", sequence: ["K", "Y", "K", "L"] } },
-  { id: "lux", name: "LUX", alias: "PRISM FOX", city: "PARIS", style: "Trickster", special: "Mirror Dash", quote: "Catch the afterimage.", color: "#ffdc4a", secondary: "#ff4da9", speed: 9, power: 6, reach: 8, mark: "L", combo: { name: "PRISM FEINT", sequence: ["T", "U", "K", "L"] } },
-  { id: "oren", name: "OREN", alias: "TIDE MONK", city: "SYDNEY", style: "Control", special: "Breaker Wave", quote: "Breathe between impacts.", color: "#48a8ff", secondary: "#42f5c5", speed: 6, power: 7, reach: 9, mark: "O", combo: { name: "TIDAL FORM", sequence: ["U", "Y", "K", "L"] } },
+  { id: "kael", name: "KAEL", alias: "SUN BREAKER", city: "SEOUL", style: "Rushdown", special: "Solar Rift", ultimate: "HELIOS OVERDRIVE", personality: "Driven · Protective · Impatient", bio: "A courier who weaponized an illegal solar prosthetic to protect his district.", costume: "Asymmetric techwear jacket · armored right sleeve · reactor sneakers", quote: "Speed is a decision.", color: "#ff7a28", secondary: "#1768ff", speed: 9, power: 6, reach: 6, mark: "K", kind: "human", portrait: { sheet: "main", index: 0 }, combo: { name: "SOLAR CHAIN", sequence: ["Y", "Y", "U", "L"] } },
+  { id: "zara", name: "ZARA", alias: "VOLT QUEEN", city: "LAGOS", style: "Pressure", special: "Thunder Step", ultimate: "QUEEN'S TEMPEST", personality: "Magnetic · Fearless · Theatrical", bio: "A grid engineer who dances through voltage surges and never enters quietly.", costume: "Conductive captain coat · braided crown · insulated gauntlets", quote: "Hear the storm arrive.", color: "#347cff", secondary: "#ff2dba", speed: 8, power: 7, reach: 5, mark: "Z", kind: "human", portrait: { sheet: "main", index: 1 }, combo: { name: "VOLTAGE RUSH", sequence: ["Y", "U", "I", "L"] } },
+  { id: "atlas", name: "ATLAS", alias: "IRON SAINT", city: "ATHENS", style: "Grappler", special: "Titan Break", ultimate: "OLYMPUS DESCENDS", personality: "Patient · Honorable · Immovable", bio: "A museum conservator who rebuilt ceremonial armor into a kinetic grappling rig.", costume: "Bronze muscle cuirass · white mantle · articulated greaves", quote: "The ground remembers.", color: "#ff9d3f", secondary: "#f4d6a0", speed: 4, power: 10, reach: 6, mark: "A", kind: "human", portrait: { sheet: "main", index: 2 }, combo: { name: "TITAN LOCK", sequence: ["Y", "L", "U", "L"] } },
+  { id: "nyx", name: "NYX", alias: "VOID SIGNAL", city: "BERLIN", style: "Zoner", special: "Black Pulse", ultimate: "EVENT HORIZON", personality: "Private · Analytical · Dry-witted", bio: "A signal pirate who bends arena light with a coat woven from programmable mesh.", costume: "Hooded mesh trench · holographic half-mask · signal gloves", quote: "Distance is control.", color: "#9b6cff", secondary: "#32204f", speed: 6, power: 7, reach: 10, mark: "N", kind: "human", portrait: { sheet: "main", index: 3 }, combo: { name: "VOID CASCADE", sequence: ["U", "Y", "I", "L"] } },
+  { id: "rio", name: "RIO", alias: "SKYLINE KID", city: "SÃO PAULO", style: "Aerial", special: "Comet Kick", ultimate: "ORBITAL SAMBA", personality: "Joyful · Restless · Daring", bio: "A rooftop courier and capoeira showstopper who treats every wall like a launchpad.", costume: "Street-athletic layers · reinforced knees · neon high-tops", quote: "Gravity is optional.", color: "#d8ff47", secondary: "#24df9b", speed: 10, power: 5, reach: 6, mark: "R", kind: "human", portrait: { sheet: "main", index: 4 }, combo: { name: "COMET LADDER", sequence: ["I", "I", "U", "L"] } },
+  { id: "sable", name: "SABLE", alias: "NIGHT BLADE", city: "TOKYO", style: "Counter", special: "Zero Cut", ultimate: "MIDNIGHT VERDICT", personality: "Reserved · Precise · Compassionate", bio: "A forensic fencer who predicts attacks by reading breath, balance, and fabric movement.", costume: "Tailored urban shinobi coat · red scarf · plated half-mask", quote: "Your move. My opening.", color: "#efefff", secondary: "#d62646", speed: 8, power: 8, reach: 7, mark: "S", kind: "human", portrait: { sheet: "main", index: 5 }, combo: { name: "ZERO VERDICT", sequence: ["Y", "I", "U", "L"] } },
+  { id: "mara", name: "MARA", alias: "RED ORBIT", city: "MEXICO CITY", style: "Balanced", special: "Meteor Arc", ultimate: "AZTEC SUPERNOVA", personality: "Warm · Competitive · Unbreakable", bio: "An aerospace mechanic who fused lucha pageantry with zero-gravity training.", costume: "Embroidered flight jacket · orbital belt · impact boots", quote: "Burn bright. Hit hard.", color: "#ff405c", secondary: "#ff8b32", speed: 7, power: 8, reach: 7, mark: "M", kind: "human", portrait: { sheet: "main", index: 6 }, combo: { name: "ORBIT BREAK", sequence: ["Y", "U", "I", "L"] } },
+  { id: "batu", name: "BATU", alias: "STEPPE WALL", city: "ULAANBAATAR", style: "Armor", special: "Stone Wake", ultimate: "ETERNAL BLUE SKY", personality: "Stoic · Loyal · Surprisingly gentle", bio: "A rescue captain whose layered armor absorbs force and returns it through the earth.", costume: "Futuristic deel coat · lamellar shoulders · heavy riding boots", quote: "I do not move.", color: "#41d7bf", secondary: "#354b68", speed: 5, power: 9, reach: 5, mark: "B", kind: "human", portrait: { sheet: "main", index: 7 }, combo: { name: "STEPPE QUAKE", sequence: ["L", "Y", "U", "L"] } },
+  { id: "lux", name: "LUX", alias: "PRISM FOX", city: "PARIS", style: "Trickster", special: "Mirror Dash", ultimate: "KALEIDOSCOPE HEIST", personality: "Playful · Elegant · Unreadable", bio: "A stage illusionist who turns refractive fashion into decoys and impossible angles.", costume: "Prismatic couture trench · fox visor · split-tail trousers", quote: "Catch the afterimage.", color: "#ffdc4a", secondary: "#a947ff", speed: 9, power: 6, reach: 8, mark: "L", kind: "human", portrait: { sheet: "main", index: 8 }, combo: { name: "PRISM FEINT", sequence: ["Y", "I", "I", "L"] } },
+  { id: "oren", name: "OREN", alias: "TIDE MONK", city: "SYDNEY", style: "Control", special: "Breaker Wave", ultimate: "SOUTHERN DELUGE", personality: "Calm · Wry · Relentless", bio: "A coastal medic who learned to redirect momentum like water around stone.", costume: "Layered ocean robes · wrapped forearms · split training boots", quote: "Breathe between impacts.", color: "#48a8ff", secondary: "#42f5c5", speed: 6, power: 7, reach: 9, mark: "O", kind: "human", portrait: { sheet: "main", index: 9 }, combo: { name: "TIDAL FORM", sequence: ["I", "Y", "U", "L"] } },
+  { id: "axiom", name: "AXIOM-7", alias: "BLUE STANDARD", city: "ORBITAL LAB", style: "Adaptive", special: "Vector Copy", ultimate: "PERFECT RECALL", personality: "Curious · Literal · Learning humor", bio: "A tournament training robot that entered the circuit to understand why humans fight for joy.", costume: "Cobalt segmented chassis · gyroscopic joints · expression-ring display", quote: "New pattern acquired.", color: "#3b7cff", secondary: "#9bdcff", speed: 7, power: 7, reach: 7, mark: "7", kind: "robot", portrait: { sheet: "bonus", index: 0 }, combo: { name: "MACHINE LEARNING", sequence: ["Y", "U", "I", "L"] } },
+  { id: "cinder", name: "CINDER", alias: "MOSS COLOSSUS", city: "KRAKATOA", style: "Juggernaut", special: "Magma Bloom", ultimate: "MOUNTAIN AWAKES", personality: "Gentle · Ancient · Easily amused", bio: "A volcanic guardian who mistakes the World Circuit for an elaborate friendship ritual.", costume: "Basalt plates · moss mantle · glowing magma seams", quote: "Small friends hit loudly.", color: "#ff6b32", secondary: "#6fa85a", speed: 3, power: 10, reach: 8, mark: "C", kind: "monster", portrait: { sheet: "bonus", index: 1 }, combo: { name: "FAULT LINE", sequence: ["U", "L", "U", "L"] } },
+  { id: "miko", name: "MIKO", alias: "SPARK MAKER", city: "OSAKA", style: "Gadget", special: "Drone Pop", ultimate: "BRIGHT IDEA BARRAGE", personality: "Inventive · Cheerful · Stubborn", bio: "A 12-year-old junior inventor competing in supervised exhibition matches with a safety drone.", costume: "Age-appropriate utility jacket · leggings · goggles · reinforced sneakers", quote: "I fixed it while you blinked!", color: "#ffd43b", secondary: "#42c7ff", speed: 8, power: 4, reach: 9, mark: "M", kind: "youth", portrait: { sheet: "bonus", index: 2 }, combo: { name: "TOOLBOX TANGO", sequence: ["Y", "I", "Y", "L"] } },
+  { id: "teo", name: "TEO", alias: "RAIL RUNNER", city: "MADRID", style: "Skirmisher", special: "Kickflip Arc", ultimate: "CITYWIDE WALL RIDE", personality: "Brave · Social · Overconfident", bio: "A 13-year-old skating champion in padded exhibition gear who fights through speed challenges.", costume: "Age-appropriate teal hoodie · padded trousers · gloves · high-tops", quote: "Bet you can't keep up.", color: "#24d4c3", secondary: "#1768ff", speed: 10, power: 4, reach: 6, mark: "T", kind: "youth", portrait: { sheet: "bonus", index: 3 }, combo: { name: "RAIL COMBO", sequence: ["I", "I", "U", "L"] } },
+  { id: "jun", name: "JUN", alias: "QUIET COMET", city: "SINGAPORE", style: "Technical", special: "Paper Crane", ultimate: "THOUSAND LESSONS", personality: "Thoughtful · Polite · Fiercely focused", bio: "A 14-year-old academy champion taking part in non-contact holographic circuit bouts.", costume: "Age-appropriate layered academy uniform · forearm pads · training shoes", quote: "Practice makes possibilities.", color: "#8ea8ff", secondary: "#f1f5ff", speed: 7, power: 5, reach: 8, mark: "J", kind: "youth", portrait: { sheet: "bonus", index: 4 }, combo: { name: "COMET LESSON", sequence: ["Y", "L", "I", "L"] } },
+  { id: "raku", name: "RAKU", alias: "TIPSY SAGE", city: "CHENGDU", style: "Unorthodox", special: "Stagger Step", ultimate: "NINE-CUP MIRAGE", personality: "Mischievous · Wise · Generous", bio: "A 72-year-old tavern storyteller whose legendary drunken style is mostly theatre and perfect balance.", costume: "Weathered teal coat · loose training trousers · travel gourd · rope sash", quote: "I wobble. The world falls.", color: "#e4bb68", secondary: "#42a7a0", speed: 6, power: 7, reach: 7, mark: "R", kind: "elder", portrait: { sheet: "bonus", index: 5 }, combo: { name: "WANDERING CUP", sequence: ["U", "I", "Y", "L"] } },
 ];
 
 const STAGES: Stage[] = [
-  { id: "shibuya", name: "NEON CROSSING", city: "TOKYO", descriptor: "Rain / Midnight", color: "#27f4ff", accent: "#ff2dba", motif: "skyline" },
-  { id: "hyperrail", name: "HYPERRAIL 88", city: "SEOUL", descriptor: "Transit / 02:14", color: "#3e9dff", accent: "#d8ff47", motif: "rail" },
-  { id: "stormmarket", name: "STORM MARKET", city: "LAGOS", descriptor: "Monsoon / Live", color: "#ffbd31", accent: "#ff2dba", motif: "market" },
-  { id: "aegis", name: "AEGIS FOUNDRY", city: "ATHENS", descriptor: "Smelter / Shift 3", color: "#ff623e", accent: "#ffd24a", motif: "forge" },
-  { id: "voidclub", name: "VOID CLUB", city: "BERLIN", descriptor: "Sublevel / 140 BPM", color: "#a26cff", accent: "#27f4ff", motif: "club" },
-  { id: "skycourt", name: "SKY COURT", city: "SÃO PAULO", descriptor: "Rooftop / Sunset", color: "#d8ff47", accent: "#28e2a0", motif: "court" },
-  { id: "solarplaza", name: "SOLAR PLAZA", city: "MEXICO CITY", descriptor: "Festival / Golden Hour", color: "#ff405c", accent: "#ffb12b", motif: "plaza" },
-  { id: "steppe", name: "STEPPE SHRINE", city: "ULAANBAATAR", descriptor: "High Wind / Dawn", color: "#41d7bf", accent: "#c9f5ff", motif: "steppe" },
-  { id: "prismmetro", name: "PRISM METRO", city: "PARIS", descriptor: "Platform / Last Train", color: "#ffdc4a", accent: "#ff4da9", motif: "metro" },
-  { id: "tidal", name: "TIDAL OPERA", city: "SYDNEY", descriptor: "Harbour / Blue Hour", color: "#48a8ff", accent: "#42f5c5", motif: "harbour" },
+  { id: "shibuya", name: "NEON CYBERPUNK ALLEY", city: "TOKYO", descriptor: "Rain / Neon Midnight", color: "#27f4ff", accent: "#ff2dba", motif: "skyline" },
+  { id: "hyperrail", name: "ABANDONED SUBWAY", city: "NEW YORK", descriptor: "Flicker / Graffiti", color: "#3e9dff", accent: "#d8ff47", motif: "rail" },
+  { id: "stormmarket", name: "ANCIENT SHAOLIN DOJO", city: "HENAN", descriptor: "Incense / Wooden Hall", color: "#ffbd31", accent: "#ff2dba", motif: "market" },
+  { id: "aegis", name: "DESERTED OIL RIG", city: "NORTH SEA", descriptor: "Storm / Ocean Surge", color: "#ff623e", accent: "#ffd24a", motif: "forge" },
+  { id: "skycourt", name: "ROOFTOP SUNSET", city: "DUBAI", descriptor: "Helipad / Golden Hour", color: "#d8ff47", accent: "#28e2a0", motif: "court" },
+  { id: "voidclub", name: "UNDERGROUND FIGHT CLUB", city: "BERLIN", descriptor: "Steel Cage / Live Crowd", color: "#a26cff", accent: "#27f4ff", motif: "club" },
+  { id: "steppe", name: "HIMALAYAN PEAK", city: "NEPAL", descriptor: "Snow / Temple Ruins", color: "#41d7bf", accent: "#c9f5ff", motif: "steppe" },
+  { id: "tidal", name: "VOLCANIC CAVERN", city: "KRAKATOA", descriptor: "Lava Pools / Deep Core", color: "#ff7438", accent: "#ffd24a", motif: "harbour" },
+  { id: "solarplaza", name: "COLOSSEUM RUINS", city: "ROME", descriptor: "Pillars / Midday", color: "#ff405c", accent: "#ffb12b", motif: "plaza" },
+  { id: "prismmetro", name: "HIGH-TECH LAB", city: "ORBITAL SECTOR", descriptor: "Glass Tubes / Final Boss", color: "#ffdc4a", accent: "#ff4da9", motif: "metro" },
 ];
 
 const OUTFITS: Outfit[] = [
@@ -86,24 +115,121 @@ const OUTFITS: Outfit[] = [
   { id: "heatwave", name: "HEATWAVE", note: "Bold summer look", cut: "heatwave" },
 ];
 
-const CONTROL_LABELS = [["A / D", "MOVE"], ["W / S", "JUMP / SQUAT"], ["T", "LIGHT PUNCH"], ["Y", "HEAVY PUNCH"], ["U", "LIGHT KICK"], ["K", "HEAVY KICK"], ["L", "SKILL"], ["SPACE", "GUARD"]];
+const CONTROL_LABELS = [["A / D", "MOVE / AUTO-BLOCK"], ["W / S", "JUMP / CROUCH"], ["U", "LIGHT PUNCH"], ["I", "HEAVY PUNCH"], ["O", "LIGHT KICK"], [";", "HEAVY KICK"], ["E", "EVASIVE ROLL"], ["SPACE", "GUARD"]];
+const COMMAND_LABELS = [["S › D › U", "FIREBALL / LONG RANGE"], ["D › S › D + I", "DRAGON PUNCH"], ["U › U › U › U", "RUSH COMBO"], ["U + I", "EX SPECIAL · ½ BAR"], ["O + ;", "MAX MODE · 1 BAR"], ["A/A or D/D", "DASH / BACKDASH"]];
+const ADVANCED_COMBOS: ComboRoute[] = [
+  { name: "RUSH COMBO", sequence: ["U", "U", "U", "U"], finisher: "special", bonus: 10, drive: 28 },
+  { name: "FLASHPOINT RUSH", sequence: ["U", "U", "I", "O"], finisher: "impact", bonus: 8, drive: 22 },
+  { name: "CROSSWIND BREAK", sequence: ["U", "U", "O", ";"], finisher: "heavyKick", bonus: 7, drive: 16 },
+  { name: "VOLT HAMMER", sequence: ["U", "I", "I", ";"], finisher: "impact", bonus: 10, drive: 24 },
+  { name: "ORBITAL SWITCH", sequence: ["U", "I", ";", "O"], finisher: "special", bonus: 12, drive: 28 },
+  { name: "PRISM DRIVER", sequence: ["U", "O", "I", "I"], finisher: "special", bonus: 11, drive: 27 },
+  { name: "NIGHTFALL SWEEP", sequence: ["U", "O", ";", ";"], finisher: "heavyKick", bonus: 9, drive: 18 },
+  { name: "TITAN ASCENT", sequence: ["I", "U", "U", ";"], finisher: "impact", bonus: 12, drive: 26 },
+  { name: "ZERO SIGNAL", sequence: ["I", "U", "I", "O"], finisher: "special", bonus: 13, drive: 30 },
+  { name: "BLUE SKY CRUSH", sequence: ["I", "I", "O", ";"], finisher: "impact", bonus: 14, drive: 30 },
+  { name: "EVENT HORIZON", sequence: ["I", "O", "O", ";"], finisher: "super", bonus: 16, drive: 68 },
+  { name: "WORLD CIRCUIT FINALE", sequence: ["O", "I", "U", ";"], finisher: "super", bonus: 18, drive: 72 },
+];
 
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 function createCombatant(fighter: Fighter, x: number, facing: 1 | -1): Combatant {
-  return { fighter, x, y: 566, vx: 0, vy: 0, facing, health: 100, drive: 65, grounded: true, crouching: false, guarding: false, attack: null, attackTime: 0, attackHit: false, hurtTime: 0, stunTime: 0, flashTime: 0, combo: 0, comboWindow: 0, wins: 0 };
+  return { fighter, x, y: 566, vx: 0, vy: 0, facing, health: 100, drive: 65, grounded: true, crouching: false, guarding: false, attack: null, attackTime: 0, attackHit: false, hurtTime: 0, stunTime: 0, flashTime: 0, combo: 0, comboWindow: 0, guardMeter: 100, evadeTime: 0, queuedAttack: null, queuedTime: 0, state: "idle", blockstunTime: 0, knockdownTime: 0, invulnTime: 0, dashTime: 0, maxModeTime: 0, superMeter: 100, wins: 0 };
 }
+
+const normalizeComboSequence = (sequence: string[]) => sequence.map((key) => ({ Y: "U", U: "I", I: "O", L: ";" }[key] ?? key));
 
 function portraitStyle(fighter: Fighter) {
   return { "--fighter": fighter.color, "--fighter-2": fighter.secondary } as React.CSSProperties;
 }
 
-function FighterCard({ fighter, selected, rival, onClick }: { fighter: Fighter; selected: boolean; rival: boolean; onClick: () => void }) {
+function portraitCropStyle(fighter: Fighter, compact: boolean) {
+  const total = fighter.portrait.sheet === "main" ? 10 : 6;
+  const position = fighter.portrait.index / (total - 1) * 100;
+  const image = fighter.portrait.sheet === "main" ? "/characters/neon-clash-roster-concept.webp" : "/characters/neon-clash-bonus-roster-concept.webp";
+  return compact
+    ? { backgroundImage: `url(${image})`, backgroundSize: `${total * 100}% auto`, backgroundPosition: `${position}% top` } as React.CSSProperties
+    : { backgroundImage: `url(${image})`, backgroundSize: "auto 100%", backgroundPosition: `${position}% center`, aspectRatio: fighter.portrait.sheet === "main" ? "153.6 / 757" : "256 / 768" } as React.CSSProperties;
+}
+
+function FighterPortrait({ fighter, compact = false }: { fighter: Fighter; compact?: boolean }) {
+  return <span className={`fighter-portrait ${compact ? "compact" : "hero"} kind-${fighter.kind}`} style={portraitCropStyle(fighter, compact)} role="img" aria-label={`${fighter.name}, ${fighter.costume}`} />;
+}
+
+const COMBAT_PORTRAIT_EDGES = {
+  main: [0, 164, 323, 485, 642, 792, 939, 1088, 1240, 1388, 1536],
+  bonus: [0, 250, 545, 840, 1098, 1332, 1536],
+};
+
+function buildLiveCombatPortrait(fighter: Fighter, image: HTMLImageElement) {
+  const referenceWidth = 1536;
+  const edges = COMBAT_PORTRAIT_EDGES[fighter.portrait.sheet];
+  const scale = image.naturalWidth / referenceWidth;
+  const sx = Math.round(edges[fighter.portrait.index] * scale);
+  const right = Math.round(edges[fighter.portrait.index + 1] * scale);
+  const sw = Math.max(1, right - sx);
+  const canvas = document.createElement("canvas");
+  canvas.width = sw; canvas.height = image.naturalHeight;
+  const context = canvas.getContext("2d", { willReadFrequently: true })!;
+  context.drawImage(image, sx, 0, sw, image.naturalHeight, 0, 0, sw, image.naturalHeight);
+
+  const pixels = context.getImageData(0, 0, sw, image.naturalHeight);
+  const data = pixels.data, total = sw * image.naturalHeight;
+  const removed = new Uint8Array(total), queue = new Int32Array(total);
+  let head = 0, tail = 0;
+  const isBackdrop = (index: number) => {
+    const offset = index * 4, r = data[offset], g = data[offset + 1], b = data[offset + 2];
+    const high = Math.max(r, g, b), low = Math.min(r, g, b);
+    return high < 38 || (high < 74 && high - low < 20);
+  };
+  const enqueue = (index: number) => {
+    if (index < 0 || index >= total || removed[index] || !isBackdrop(index)) return;
+    removed[index] = 1; queue[tail++] = index;
+  };
+  for (let x = 0; x < sw; x++) { enqueue(x); enqueue((image.naturalHeight - 1) * sw + x); }
+  for (let y = 0; y < image.naturalHeight; y++) { enqueue(y * sw); enqueue(y * sw + sw - 1); }
+  while (head < tail) {
+    const index = queue[head++], x = index % sw;
+    if (x > 0) enqueue(index - 1);
+    if (x + 1 < sw) enqueue(index + 1);
+    enqueue(index - sw); enqueue(index + sw);
+  }
+  for (let index = 0; index < total; index++) {
+    const offset = index * 4;
+    if (removed[index]) data[offset + 3] = 0;
+    else {
+      const high = Math.max(data[offset], data[offset + 1], data[offset + 2]);
+      const low = Math.min(data[offset], data[offset + 1], data[offset + 2]);
+      if (high < 17 && high - low < 8) data[offset + 3] = 0;
+    }
+  }
+  const components = new Uint32Array(total);
+  let componentId = 0, largestId = 0, largestSize = 0;
+  for (let start = 0; start < total; start++) {
+    if (data[start * 4 + 3] === 0 || components[start]) continue;
+    componentId += 1; head = 0; tail = 0; queue[tail++] = start; components[start] = componentId;
+    while (head < tail) {
+      const index = queue[head++], x = index % sw;
+      for (const neighbor of [x > 0 ? index - 1 : -1, x + 1 < sw ? index + 1 : -1, index - sw, index + sw]) {
+        if (neighbor < 0 || neighbor >= total || components[neighbor] || data[neighbor * 4 + 3] === 0) continue;
+        components[neighbor] = componentId; queue[tail++] = neighbor;
+      }
+    }
+    if (tail > largestSize) { largestSize = tail; largestId = componentId; }
+  }
+  if (largestId) for (let index = 0; index < total; index++) if (components[index] !== largestId) data[index * 4 + 3] = 0;
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.putImageData(pixels, 0, 0);
+  return canvas;
+}
+
+function FighterCard({ fighter, selected, onClick }: { fighter: Fighter; selected: boolean; onClick: () => void }) {
   return (
-    <button className={`fighter-card ${selected ? "is-selected" : ""} ${rival ? "is-rival" : ""}`} onClick={onClick} style={portraitStyle(fighter)} aria-pressed={selected}>
+    <button className={`fighter-card ${selected ? "is-selected" : ""}`} onClick={onClick} style={portraitStyle(fighter)} aria-pressed={selected} aria-label={`Select ${fighter.name}, ${fighter.alias}`}>
       <span className="fighter-number">{String(FIGHTERS.indexOf(fighter) + 1).padStart(2, "0")}</span>
-      <span className="portrait-mark" aria-hidden="true">{fighter.mark}</span>
+      <FighterPortrait fighter={fighter} compact />
       <span className="fighter-card-copy"><strong>{fighter.name}</strong><small>{fighter.style}</small></span>
     </button>
   );
@@ -130,10 +256,12 @@ export function NeonClash() {
   const cpu = useMemo(() => FIGHTERS.find((f) => f.id === cpuId) ?? FIGHTERS[1], [cpuId]);
   const stage = useMemo(() => STAGES.find((s) => s.id === stageId) ?? STAGES[0], [stageId]);
   const outfit = useMemo(() => OUTFITS.find((s) => s.id === outfitId) ?? OUTFITS[0], [outfitId]);
-  const remoteInputRef = useRef<Record<string, boolean>>({});
+  const remoteInputRef = useRef<InputFrame>({});
   const remoteStateRef = useRef<MatchSnapshot | null>(null);
   const roomRef = useRef<RoomSession | null>(null);
   const lastStatePush = useRef(0);
+  const statePushInFlight = useRef(false);
+  const autoJoinAttemptedRef = useRef(false);
 
   const applyRoomConfig = useCallback((config: RoomConfig) => {
     setPlayerId(config.playerId); setCpuId(config.cpuId); setStageId(config.stageId); setDifficulty(config.difficulty); setOutfitId(config.outfitId);
@@ -143,7 +271,11 @@ export function NeonClash() {
   useEffect(() => {
     const code = new URLSearchParams(window.location.search).get("room");
     if (!code) return;
-    const timer = window.setTimeout(() => { setMode("ONLINE"); setRoomCode(code.toUpperCase()); setLobbyOpen(true); }, 0);
+    const linkedCode = code.toUpperCase().slice(0, 6);
+    const timer = window.setTimeout(() => {
+      setMode("ONLINE"); setRoomCode(linkedCode); setLobbyOpen(true);
+      if (!autoJoinAttemptedRef.current && linkedCode.length === 6) { autoJoinAttemptedRef.current = true; void joinRoom(false, linkedCode); }
+    }, 0);
     return () => window.clearTimeout(timer);
   }, []);
 
@@ -160,18 +292,22 @@ export function NeonClash() {
   useEffect(() => {
     if (!room?.id || !room.token) return;
     let active = true;
+    let pollInFlight = false;
     const poll = async () => {
+      if (pollInFlight) return;
+      pollInFlight = true;
       try {
         const response = await fetch(`/api/rooms/${room.id}?token=${encodeURIComponent(room.token)}`, { cache: "no-store" });
         const data = await response.json();
         if (!active || !response.ok) return;
         remoteInputRef.current = data.room.guestInput ?? {};
         if (room.role !== "host" && data.room.state && Object.keys(data.room.state).length) remoteStateRef.current = data.room.state;
-        setRoom((current) => current ? { ...current, players: data.room.players, spectators: data.room.spectators, status: data.room.status } : current);
+        setRoom((current) => current ? { ...current, players: data.room.players, spectators: data.room.spectators, status: data.room.status, hostOnline: data.room.hostOnline, guestOnline: data.room.guestOnline } : current);
         if (room.role !== "host" && data.room.status === "fighting") { setLobbyOpen(false); setScreen("fight"); }
       } catch { if (active) setRoomError("ROOM CONNECTION INTERRUPTED — RETRYING"); }
+      finally { pollInFlight = false; }
     };
-    void poll(); const interval = window.setInterval(poll, room.role === "spectator" ? 140 : 90);
+    void poll(); const interval = window.setInterval(poll, room.role === "spectator" ? 180 : 90);
     return () => { active = false; window.clearInterval(interval); };
   }, [room?.id, room?.role, room?.token]);
 
@@ -186,7 +322,7 @@ export function NeonClash() {
     finally { setRoomBusy(false); }
   };
 
-  const joinRoom = async (watchOnly = false, selectedCode?: string) => {
+  async function joinRoom(watchOnly = false, selectedCode?: string) {
     const code = (selectedCode ?? roomCode).trim().toUpperCase(); if (!code) return;
     setRoomBusy(true); setRoomError("");
     try {
@@ -198,16 +334,18 @@ export function NeonClash() {
     finally { setRoomBusy(false); }
   };
 
-  const sendInput = useCallback((value: Record<string, boolean>) => {
+  const sendInput = useCallback((value: InputFrame) => {
     const session = roomRef.current; if (!session || session.role !== "guest") return;
     void fetch(`/api/rooms/${session.id}/input`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: session.token, input: value }) });
   }, []);
 
   const publishSnapshot = useCallback((snapshot: MatchSnapshot) => {
     const session = roomRef.current; const now = performance.now();
-    if (!session || session.role !== "host" || now - lastStatePush.current < 70) return;
+    if (!session || session.role !== "host" || statePushInFlight.current || now - lastStatePush.current < 80) return;
     lastStatePush.current = now;
-    void fetch(`/api/rooms/${session.id}/state`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: session.token, state: snapshot, status: snapshot.roundState === "done" ? "complete" : "fighting" }) });
+    statePushInFlight.current = true;
+    void fetch(`/api/rooms/${session.id}/state`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: session.token, state: snapshot, status: snapshot.roundState === "done" ? "complete" : "fighting" }) })
+      .finally(() => { statePushInFlight.current = false; });
   }, []);
 
   const randomRival = useCallback((exclude: string) => {
@@ -235,20 +373,18 @@ export function NeonClash() {
       {screen === "select" ? (
         <section className="select-screen" id="top">
           <div className="select-heading">
-            <div><p className="eyebrow">FIGHTER SELECT / 10 CONTENDERS</p><h1>CHOOSE YOUR<br /><em>FREQUENCY</em></h1></div>
-            <p className="intro">Ten fighting styles. One broadcast arena. Select your contender, read the matchup, then take the world circuit live.</p>
+            <div><p className="eyebrow">FIGHTER SELECT / 16 CONTENDERS</p><h1>CHOOSE YOUR<br /><em>FREQUENCY</em></h1></div>
+            <p className="intro">Humans, youth exhibition heroes, robots, monsters, and one famously tipsy master. Read every personality and finishing art before taking the circuit live.</p>
           </div>
 
-          <div className="versus-preview">
-            <FighterPanel fighter={player} side="player" />
-            <div className="vs-spine"><span>ROUND</span><strong>VS</strong><small>01</small></div>
-            <FighterPanel fighter={cpu} side="cpu" />
+          <div className="versus-preview solo-preview">
+            <FighterPanel fighter={player} outfit={outfit} side="player" />
           </div>
 
           <div className="roster-wrap">
-            <div className="roster-label"><span>ROSTER // SELECT P1</span><button onClick={() => randomRival(playerId)}>RANDOMIZE RIVAL ↻</button></div>
+            <div className="roster-label"><span>ROSTER // 16 DISTINCT FIGHTERS // ONE ACTIVE SELECTION</span><small>RIVAL LOCKS WHEN THE MATCH STARTS</small></div>
             <div className="roster-grid">
-              {FIGHTERS.map((fighter) => <FighterCard key={fighter.id} fighter={fighter} selected={fighter.id === playerId} rival={fighter.id === cpuId} onClick={() => { setPlayerId(fighter.id); if (fighter.id === cpuId) randomRival(fighter.id); }} />)}
+              {FIGHTERS.map((fighter) => <FighterCard key={fighter.id} fighter={fighter} selected={fighter.id === playerId} onClick={() => { setPlayerId(fighter.id); if (fighter.id === cpuId) randomRival(fighter.id); }} />)}
             </div>
           </div>
 
@@ -272,9 +408,16 @@ export function NeonClash() {
         <section className="fight-screen">
           <div className="broadcast-strip"><span>LIVE</span><p>{stage.name} {"//"} {stage.descriptor}</p><strong>{stage.city} · {player.name} ↔ {cpu.name}</strong></div>
           <GameCanvas key={matchKey} player={player} cpu={cpu} stage={stage} outfit={outfit} difficulty={difficulty} mode={mode} role={room?.role ?? "host"} remoteInputRef={remoteInputRef} remoteStateRef={remoteStateRef} sendInput={sendInput} onSnapshot={publishSnapshot} onMatchEnd={setOutcome} />
+          <div className="combo-library" aria-label="Advanced attack combos">
+            <strong>12 ADVANCED COMBOS</strong>
+            {ADVANCED_COMBOS.map((combo) => <div key={combo.name}><kbd>{combo.sequence.join(" › ")}</kbd><span>{combo.name}</span></div>)}
+          </div>
           <div className="control-deck">
             <div className="keyboard-map">
               {CONTROL_LABELS.map(([key, action]) => <div key={action}><kbd>{key}</kbd><span>{action}</span></div>)}
+            </div>
+            <div className="command-map" aria-label="Motion commands">
+              {COMMAND_LABELS.map(([command, action]) => <div key={action}><kbd>{command}</kbd><span>{action}</span></div>)}
             </div>
             <button className="menu-button" onClick={() => setScreen("select")}>← FIGHTER SELECT</button>
           </div>
@@ -290,21 +433,40 @@ export function NeonClash() {
 }
 
 function RoomLobby({ room, code, setCode, busy, error, openRooms, createRoom, joinRoom, startFight, close }: { room: RoomSession | null; code: string; setCode: (value: string) => void; busy: boolean; error: string; openRooms: OpenRoom[]; createRoom: () => void; joinRoom: (watchOnly?: boolean, code?: string) => void; startFight: () => void; close: () => void }) {
-  const share = () => { const url = `${window.location.origin}${window.location.pathname}?room=${room?.id ?? code}`; void navigator.clipboard.writeText(url); };
-  const email = () => { const url = `${window.location.origin}${window.location.pathname}?room=${room?.id ?? code}`; window.location.href = `mailto:?subject=${encodeURIComponent("Join my Neon Clash room")}&body=${encodeURIComponent(`Room ${room?.id ?? code}: ${url}`)}`; };
-  return <div className="online-backdrop"><section className="online-lobby"><button className="close-lobby" onClick={close}>×</button><p className="eyebrow">PUBLIC MATCHMAKING // LIVE SPECTATORS</p><h2>{room ? `ROOM ${room.id}` : "ENTER THE LOBBY"}</h2><p className="lobby-copy">Every room has exactly two fighter slots. Anyone who joins after both slots are filled enters as a live spectator.</p>{room ? <div className="room-console"><div className="slot-row"><span className="filled">P1<br /><b>HOST</b></span><i>VS</i><span className={room.players === 2 ? "filled" : "waiting"}>P2<br /><b>{room.players === 2 ? "READY" : "WAITING"}</b></span></div><div className="room-metrics"><span>{room.players}/2 PLAYERS</span><span>{room.spectators} WATCHING</span><span>{room.status.toUpperCase()}</span></div><div className="room-actions"><button onClick={share}>COPY ROOM LINK</button><button onClick={email}>EMAIL INVITE</button>{room.role === "host" && <button className="primary" disabled={room.players < 2} onClick={startFight}>{room.players < 2 ? "WAITING FOR P2" : "START MATCH"}</button>}{room.role !== "host" && <button className="primary" disabled>{room.role === "spectator" ? "WATCHING ROOM" : "WAITING FOR HOST"}</button>}</div></div> : <div className="lobby-grid"><div><b>CREATE A ROOM</b><span>Your selected fighters, arena, difficulty, and outfits become the room setup.</span><button className="primary" disabled={busy} onClick={createRoom}>CREATE PUBLIC ROOM</button></div><div><b>JOIN OR WATCH</b><input value={code} onChange={(event) => setCode(event.target.value.toUpperCase().slice(0, 6))} aria-label="Room code" placeholder="6-DIGIT ROOM CODE" /><button disabled={busy || code.length !== 6} onClick={() => joinRoom(false)}>JOIN ROOM</button><button disabled={busy || code.length !== 6} onClick={() => joinRoom(true)}>WATCH ONLY</button></div></div>}{error && <strong className="connection-state failed">{error}</strong>}{!room && openRooms.length > 0 && <div className="open-room-list"><b>OPEN ROOMS</b>{openRooms.map((item) => <div key={item.id}><span><strong>{item.id}</strong><small>{item.players}/2 · {item.status.toUpperCase()}</small></span><button onClick={() => joinRoom(false, item.id)}>{item.players < 2 ? "JOIN" : "WATCH"}</button></div>)}</div>}</section></div>;
+  const [copied, setCopied] = useState("");
+  const [inviteUrl, setInviteUrl] = useState("");
+  const [networkReady, setNetworkReady] = useState(false);
+  useEffect(() => {
+    setInviteUrl(`${window.location.origin}${window.location.pathname}?room=${room?.id ?? code}`);
+    setNetworkReady(!["localhost", "127.0.0.1"].includes(window.location.hostname));
+  }, [code, room?.id]);
+  const copyText = async (value: string, label: string) => {
+    try {
+      if (window.isSecureContext && navigator.clipboard) await navigator.clipboard.writeText(value);
+      else {
+        const field = document.createElement("textarea");
+        field.value = value; field.style.position = "fixed"; field.style.opacity = "0";
+        document.body.appendChild(field); field.select(); document.execCommand("copy"); field.remove();
+      }
+      setCopied(label); window.setTimeout(() => setCopied(""), 1600);
+    } catch { setCopied("COPY FAILED — SELECT LINK ABOVE"); }
+  };
+  const email = () => { window.location.href = `mailto:?subject=${encodeURIComponent("Join my Neon Clash room")}&body=${encodeURIComponent(`Room ${room?.id ?? code}: ${inviteUrl}`)}`; };
+  return <div className="online-backdrop"><section className="online-lobby"><button className="close-lobby" onClick={close}>×</button><p className="eyebrow">CROSS-COMPUTER MATCHMAKING // LIVE SPECTATORS</p><h2>{room ? `ROOM ${room.id}` : "ENTER THE LOBBY"}</h2><p className="lobby-copy">Create a room and open its Player 2 link on the other computer. Invite links now join automatically.</p>{room ? <div className="room-console"><div className="slot-row"><span className={room.hostOnline === false ? "waiting" : "filled"}>P1<br /><b>{room.hostOnline === false ? "OFFLINE" : "HOST"}</b></span><i>VS</i><span className={room.players === 2 ? "filled" : "waiting"}>P2<br /><b>{room.players === 2 ? "CONNECTED" : "WAITING"}</b></span></div><div className="room-metrics"><span>{room.players}/2 PLAYERS</span><span>{room.spectators} WATCHING</span><span>{room.status.toUpperCase()}</span></div><div className="invite-strip"><label>PLAYER 2 AUTO-JOIN LINK</label><input value={inviteUrl} readOnly aria-label="Player 2 invite link" /><small>{networkReady ? "Ready for another computer on this network." : "For another computer, open Neon Clash using this computer's network address before copying."}</small></div><div className="room-actions"><button onClick={() => void copyText(inviteUrl, "LINK COPIED")}>{copied || "COPY PLAYER 2 LINK"}</button><a href={inviteUrl} target="_blank" rel="noreferrer">OPEN PLAYER 2 LINK</a><button onClick={() => void copyText(room.id, "ROOM CODE COPIED")}>COPY ROOM CODE</button><button onClick={email}>EMAIL INVITE</button>{room.role === "host" && <button className="primary" disabled={room.players < 2} onClick={startFight}>{room.players < 2 ? "WAITING FOR P2" : "START MATCH"}</button>}{room.role !== "host" && <button className="primary" disabled>{room.role === "spectator" ? "WATCHING ROOM" : room.hostOnline === false ? "HOST DISCONNECTED" : "WAITING FOR HOST"}</button>}</div></div> : <div className="lobby-grid"><div><b>HOST ON THIS COMPUTER</b><span>Create a six-character room and share the auto-join link with Player 2.</span><button className="primary" disabled={busy} onClick={createRoom}>CREATE TWO-PLAYER ROOM</button></div><div><b>JOIN FROM ANOTHER COMPUTER</b><input value={code} onChange={(event) => setCode(event.target.value.toUpperCase().slice(0, 6))} aria-label="Room code" placeholder="6-DIGIT ROOM CODE" /><button disabled={busy || code.length !== 6} onClick={() => joinRoom(false)}>JOIN AS PLAYER 2</button><button disabled={busy || code.length !== 6} onClick={() => joinRoom(true)}>WATCH ONLY</button></div></div>}{error && <strong className="connection-state failed">{error}</strong>}{!room && openRooms.length > 0 && <div className="open-room-list"><b>OPEN ROOMS</b>{openRooms.map((item) => <div key={item.id}><span><strong>{item.id}</strong><small>{item.players}/2 · {item.status.toUpperCase()}</small></span><button onClick={() => joinRoom(item.players >= 2, item.id)}>{item.players < 2 ? "JOIN" : "WATCH"}</button></div>)}</div>}</section></div>;
 }
 
-function FighterPanel({ fighter, side }: { fighter: Fighter; side: "player" | "cpu" }) {
+function FighterPanel({ fighter, outfit, side }: { fighter: Fighter; outfit: Outfit; side: "player" | "cpu" }) {
   return (
     <article className={`fighter-panel ${side}`} style={portraitStyle(fighter)}>
       <div className="panel-no">{side === "player" ? "P1" : "CPU"}</div>
-      <div className="hero-mark" aria-hidden="true"><span>{fighter.mark}</span></div>
+      <div className="hero-mark"><FighterPortrait fighter={fighter} /></div>
       <div className="fighter-copy">
-        <p>{fighter.city} {"//"} {fighter.style}</p><h2>{fighter.name}</h2><h3>{fighter.alias}</h3><blockquote>“{fighter.quote}”</blockquote>
+        <p>{fighter.city} {"//"} {fighter.style} {"//"} {fighter.kind.toUpperCase()}</p><h2>{fighter.name}</h2><h3>{fighter.alias}</h3><blockquote>“{fighter.quote}”</blockquote>
+        <div className="personality-card"><strong>{fighter.personality}</strong><span>{fighter.bio}</span><small>{outfit.name}: {fighter.costume}</small></div>
         <div className="stat-row"><Stat label="SPD" value={fighter.speed} /><Stat label="PWR" value={fighter.power} /><Stat label="RNG" value={fighter.reach} /></div>
         <div className="special-tag"><span>SPECIAL</span><strong>{fighter.special}</strong></div>
-        <div className="combo-tag"><span>{fighter.combo.name}</span><strong>{fighter.combo.sequence.join(" › ")}</strong></div>
+        <div className="ultimate-tag"><span>CINEMATIC FINISH</span><strong>{fighter.ultimate}</strong></div>
+        <div className="combo-tag"><span>{fighter.combo.name}</span><strong>{normalizeComboSequence(fighter.combo.sequence).join(" › ")}</strong></div>
       </div>
     </article>
   );
@@ -314,9 +476,9 @@ function Stat({ label, value }: { label: string; value: number }) {
   return <div><span>{label}</span><i><b style={{ width: `${value * 10}%` }} /></i><em>{value}</em></div>;
 }
 
-function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remoteInputRef, remoteStateRef, sendInput, onSnapshot, onMatchEnd }: { player: Fighter; cpu: Fighter; stage: Stage; outfit: Outfit; difficulty: "ROOKIE" | "PRO" | "ACE"; mode: "CPU" | "ONLINE"; role: RoomRole; remoteInputRef: React.RefObject<Record<string, boolean>>; remoteStateRef: React.RefObject<MatchSnapshot | null>; sendInput: (value: Record<string, boolean>) => void; onSnapshot: (value: MatchSnapshot) => void; onMatchEnd: (value: string) => void }) {
+function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remoteInputRef, remoteStateRef, sendInput, onSnapshot, onMatchEnd }: { player: Fighter; cpu: Fighter; stage: Stage; outfit: Outfit; difficulty: "ROOKIE" | "PRO" | "ACE"; mode: "CPU" | "ONLINE"; role: RoomRole; remoteInputRef: React.RefObject<InputFrame>; remoteStateRef: React.RefObject<MatchSnapshot | null>; sendInput: (value: InputFrame) => void; onSnapshot: (value: MatchSnapshot) => void; onMatchEnd: (value: string) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const inputRef = useRef<Record<string, boolean>>({});
+  const inputRef = useRef<InputFrame>({ actionSeq: 0, action: "" });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -327,7 +489,7 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
     const W = 1280, H = 720, FLOOR = 584;
     const lowPower = (navigator as Navigator & { deviceMemory?: number }).deviceMemory !== undefined && ((navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8) <= 4;
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const dpr = Math.min(window.devicePixelRatio || 1, lowPower ? 1.25 : 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, lowPower ? 1 : 1.25);
     canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = true;
@@ -337,9 +499,21 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
     const bg = background.getContext("2d")!;
     drawBackground(bg, W, H, stage);
 
-    const spriteCache = new Map<string, HTMLCanvasElement>();
-    for (const f of [player, cpu]) spriteCache.set(f.id, buildSprite(f, outfit));
-
+    const spriteSheets: Partial<Record<string, HTMLImageElement>> = {};
+    for (const [id, src] of Object.entries({ kael: "/characters/kael-combat-sprites-v2.png", zara: "/characters/zara-combat-sprites-v2.png" })) {
+      const image = new Image(); image.decoding = "async"; image.src = src; spriteSheets[id] = image;
+    }
+    const livePortraits = new Map<string, HTMLCanvasElement>();
+    for (const [sheet, src] of Object.entries({ main: "/characters/neon-clash-roster-concept.webp", bonus: "/characters/neon-clash-bonus-roster-concept.webp" }) as Array<[Fighter["portrait"]["sheet"], string]>) {
+      const image = new Image(); image.decoding = "async";
+      const prepare = () => {
+        for (const fighter of [player, cpu]) {
+          if (fighter.portrait.sheet === sheet && !spriteSheets[fighter.id]) livePortraits.set(fighter.id, buildLiveCombatPortrait(fighter, image));
+        }
+      };
+      image.onload = prepare; image.src = src;
+      if (image.complete && image.naturalWidth > 0) prepare();
+    }
     const p1 = createCombatant(player, 350, 1);
     const p2 = createCombatant(cpu, 930, -1);
     const projectiles: Projectile[] = [];
@@ -358,19 +532,46 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
     let running = true;
     const fixed = 1 / 60;
     const particleCap = lowPower || reduceMotion ? 36 : 90;
-    const aiRate = difficulty === "ROOKIE" ? 0.56 : difficulty === "PRO" ? 0.33 : 0.19;
+    const aiRate = difficulty === "ROOKIE" ? 1.15 : difficulty === "PRO" ? 0.82 : 0.55;
     const inputHistory: Array<{ key: string; at: number }> = [];
+    const directionHistory: Array<{ key: string; at: number }> = [];
+    const inputRing: Array<{ frame: number; keys: string[] }> = [];
+    const lastMoveTap: Record<string, number> = { left: -1000, right: -1000 };
+    const attackPressedAt: Record<string, number> = {};
+    let simulationFrame = 0;
+    let jumpPressedAt = 0;
+    let debugBoxes = false;
+    const previousWants = new Map<Combatant, Record<string, boolean>>([[p1, {}], [p2, {}]]);
+    let lastRemoteActionSeq = -1;
+    let snapshotSequence = 0;
+    let lastAppliedRemoteSequence = -1;
+    let remoteSnapshotReceivedAt = performance.now();
     let comboBonus = 0;
+    let comboAttack: Combatant["attack"] = null;
     let comboCallout = 0;
+    let activeComboName = player.combo.name;
+    let finisherTime = 0;
+    let finisherName = "";
+    let finisherColor = player.color;
+    let hitStop = 0;
+    let impactFlash = 0;
+    let combatCallout = "";
+    let combatCalloutTime = 0;
 
-    const recordAction = (key: string) => {
+    const recordAction = (key: string): Combatant["attack"] => {
       const now = performance.now(); inputHistory.push({ key, at: now });
-      while (inputHistory.length > 8 || (inputHistory[0] && now - inputHistory[0].at > 1200)) inputHistory.shift();
-      const sequence = player.combo.sequence;
-      const tail = inputHistory.slice(-sequence.length);
-      if (tail.length === sequence.length && tail.every((item, index) => item.key === sequence[index]) && tail[tail.length - 1].at - tail[0].at <= 1100) {
-        comboBonus = 12; comboCallout = 1.25; p1.drive = clamp(p1.drive + 18, 0, 100); inputHistory.length = 0;
+      while (inputHistory.length > 10 || (inputHistory[0] && now - inputHistory[0].at > 1700)) inputHistory.shift();
+      const routes: ComboRoute[] = [{ name: player.combo.name, sequence: normalizeComboSequence(player.combo.sequence), finisher: "special", bonus: 12, drive: 28 }, ...ADVANCED_COMBOS];
+      for (const route of routes) {
+        const tail = inputHistory.slice(-route.sequence.length);
+        if (tail.length === route.sequence.length && tail.every((item, index) => item.key === route.sequence[index]) && tail[tail.length - 1].at - tail[0].at <= 1550) {
+          comboBonus = route.bonus; comboAttack = route.finisher; comboCallout = 1.4; activeComboName = route.name;
+          const minimumDrive = route.finisher === "super" ? 65 : route.finisher === "impact" ? 32 : route.finisher === "special" ? 25 : 0;
+          p1.drive = clamp(Math.max(p1.drive + route.drive, minimumDrive), 0, 100); inputHistory.length = 0;
+          return route.finisher;
+        }
       }
+      return null;
     };
 
     const applyCombatantSnapshot = (target: Combatant, value: CombatantSnapshot) => {
@@ -378,18 +579,34 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       target.health = value.health; target.drive = value.drive; target.grounded = value.grounded; target.crouching = value.crouching; target.guarding = value.guarding;
       target.attack = value.attack; target.attackTime = value.attackTime; target.attackHit = value.attackHit; target.hurtTime = value.hurtTime; target.stunTime = value.stunTime;
       target.flashTime = value.flashTime; target.combo = value.combo; target.comboWindow = value.comboWindow; target.wins = value.wins;
+      target.guardMeter = value.guardMeter ?? 100; target.evadeTime = value.evadeTime ?? 0;
+      target.state = value.state ?? "idle"; target.blockstunTime = value.blockstunTime ?? 0; target.knockdownTime = value.knockdownTime ?? 0;
+      target.invulnTime = value.invulnTime ?? 0; target.dashTime = value.dashTime ?? 0; target.maxModeTime = value.maxModeTime ?? 0; target.superMeter = value.superMeter ?? 100;
     };
 
-    const applyRemoteSnapshot = () => {
-      const snapshot = remoteStateRef.current; if (!snapshot) return;
+    const applyRemoteSnapshot = (onlyWhenNew = false) => {
+      const snapshot = remoteStateRef.current; if (!snapshot) return false;
+      const nextSequence = Number(snapshot.sequence ?? 0);
+      const isNew = nextSequence !== lastAppliedRemoteSequence;
+      if (onlyWhenNew && !isNew) return false;
+      if (isNew) { lastAppliedRemoteSequence = nextSequence; remoteSnapshotReceivedAt = performance.now(); }
+      const prediction = Math.min(0.1, Math.max(0, (performance.now() - remoteSnapshotReceivedAt) / 1000));
       applyCombatantSnapshot(p1, snapshot.p1); applyCombatantSnapshot(p2, snapshot.p2); timer = snapshot.timer; round = snapshot.round; roundState = snapshot.roundState;
+      for (const combatant of [p1, p2]) {
+        combatant.x = clamp(combatant.x + combatant.vx * prediction, 92, W - 92);
+        combatant.y += combatant.vy * prediction;
+        combatant.attackTime += prediction;
+        combatant.hurtTime = Math.max(0, combatant.hurtTime - prediction);
+        combatant.stunTime = Math.max(0, combatant.stunTime - prediction);
+      }
       projectiles.length = 0;
-      for (const item of snapshot.projectiles ?? []) projectiles.push({ ...item, owner: item.owner === 1 ? p1 : p2 });
+      for (const item of snapshot.projectiles ?? []) projectiles.push({ ...item, x: item.x + item.vx * prediction, life: Math.max(0, item.life - prediction), owner: item.owner === 1 ? p1 : p2 });
+      return true;
     };
 
-    const combatantSnapshot = (value: Combatant): CombatantSnapshot => ({ x: value.x, y: value.y, vx: value.vx, vy: value.vy, facing: value.facing, health: value.health, drive: value.drive, grounded: value.grounded, crouching: value.crouching, guarding: value.guarding, attack: value.attack, attackTime: value.attackTime, attackHit: value.attackHit, hurtTime: value.hurtTime, stunTime: value.stunTime, flashTime: value.flashTime, combo: value.combo, comboWindow: value.comboWindow, wins: value.wins });
+    const combatantSnapshot = (value: Combatant): CombatantSnapshot => ({ x: value.x, y: value.y, vx: value.vx, vy: value.vy, facing: value.facing, health: value.health, drive: value.drive, grounded: value.grounded, crouching: value.crouching, guarding: value.guarding, attack: value.attack, attackTime: value.attackTime, attackHit: value.attackHit, hurtTime: value.hurtTime, stunTime: value.stunTime, flashTime: value.flashTime, combo: value.combo, comboWindow: value.comboWindow, guardMeter: value.guardMeter, evadeTime: value.evadeTime, state: value.state, blockstunTime: value.blockstunTime, knockdownTime: value.knockdownTime, invulnTime: value.invulnTime, dashTime: value.dashTime, maxModeTime: value.maxModeTime, superMeter: value.superMeter, wins: value.wins });
 
-    const snapshot = (): MatchSnapshot => ({ p1: combatantSnapshot(p1), p2: combatantSnapshot(p2), timer, round, roundState, projectiles: projectiles.map((item) => ({ x: item.x, y: item.y, vx: item.vx, life: item.life, color: item.color, damage: item.damage, owner: item.owner === p1 ? 1 : 2 })) });
+    const snapshot = (): MatchSnapshot => ({ sequence: ++snapshotSequence, p1: combatantSnapshot(p1), p2: combatantSnapshot(p2), timer, round, roundState, projectiles: projectiles.map((item) => ({ x: item.x, y: item.y, vx: item.vx, life: item.life, color: item.color, damage: item.damage, owner: item.owner === p1 ? 1 : 2 })) });
 
     const burst = (x: number, y: number, color: string, count: number) => {
       const room = particleCap - particles.length;
@@ -400,99 +617,181 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       }
     };
 
-    const startAttack = (c: Combatant, type: Combatant["attack"]) => {
-      if (!type || c.attack || c.hurtTime > 0 || c.stunTime > 0 || roundState !== "fight") return;
-      const costs = { lightPunch: 0, heavyPunch: 0, lightKick: 0, heavyKick: 0, special: 25, impact: 32 };
-      if (c.drive < costs[type]) return;
+    const startAttack = (c: Combatant, type: Combatant["attack"], cancel = false) => {
+      if (!type || (!cancel && c.attack) || c.hurtTime > 0 || c.stunTime > 0 || c.evadeTime > 0 || roundState !== "fight") return false;
+      const costs = { lightPunch: 0, heavyPunch: 0, lightKick: 0, heavyKick: 0, special: 25, impact: 32, super: 65 };
+      if (c.drive < costs[type]) return false;
       c.drive -= costs[type]; c.attack = type; c.attackTime = 0; c.attackHit = false; c.guarding = false;
-      if (type === "special" && (c.fighter.style === "Zoner" || c.fighter.style === "Control")) {
-        projectiles.push({ x: c.x + c.facing * 70, y: c.y - 116, vx: c.facing * (520 + c.fighter.reach * 10), life: 1.8, owner: c, color: c.fighter.color, damage: 13 + c.fighter.power * 0.45 + (c === p1 ? comboBonus : 0) });
+      if (c === p1 && comboBonus > 0 && type === comboAttack) { burst(c.x + c.facing * 55, c.y - 132, c.fighter.color, 28); finisherTime = .55; finisherName = activeComboName; finisherColor = c.fighter.color; shake = Math.max(shake, 14); }
+      if (type === "special" || type === "super") {
+        const comboFinisher = c === p1 && comboBonus > 0 && type === comboAttack;
+        burst(c.x + c.facing * 58, c.y - 126, c.fighter.color, type === "super" ? 46 : comboFinisher ? 34 : 14);
+        if (type === "super" || comboFinisher) { finisherTime = type === "super" ? 1.55 : 1.15; finisherName = type === "super" && !comboFinisher ? c.fighter.ultimate : activeComboName; finisherColor = c.fighter.color; shake = type === "super" ? 23 : 16; }
       }
+      if (type === "special" || type === "super") {
+        const rangedStyle = c.fighter.style === "Zoner" || c.fighter.style === "Control" || c.fighter.style === "Gadget";
+        projectiles.push({ x: c.x + c.facing * 76, y: c.y - 122, vx: c.facing * (type === "super" ? 760 : (rangedStyle ? 610 : 525) + c.fighter.reach * 10), life: type === "super" ? 2.35 : 1.95, owner: c, color: c.fighter.color, damage: (type === "super" ? 27 : rangedStyle ? 14 : 11) + c.fighter.power * 0.45 + (c === p1 && type === comboAttack ? comboBonus : 0) });
+      }
+      return true;
     };
 
-    const hit = (attacker: Combatant, defender: Combatant, damage: number, force: number, color: string, impact = false) => {
-      if (defender.hurtTime > 0.02 || roundState !== "fight") return;
+    const hit = (attacker: Combatant, defender: Combatant, damage: number, force: number, color: string, impact = false, hitstunFrames = 13, blockstunFrames = 7) => {
+      if (defender.hurtTime > 0.02 || defender.evadeTime > 0.06 || defender.invulnTime > 0 || roundState !== "fight") return;
       const blocked = defender.guarding && defender.grounded && defender.facing === -attacker.facing;
+      const counter = !blocked && !!defender.attack;
       const dealt = blocked ? damage * 0.28 : damage;
       defender.health = clamp(defender.health - dealt, 0, 100);
       defender.drive = clamp(defender.drive - (blocked ? 7 : 3), 0, 100);
       defender.vx = attacker.facing * force * (blocked ? 0.35 : 1);
       defender.hurtTime = blocked ? 0.12 : impact ? 0.46 : 0.24;
+      defender.blockstunTime = blocked ? blockstunFrames / 60 : 0;
+      defender.stunTime = blocked ? 0 : Math.max(defender.stunTime, hitstunFrames / 60);
+      if (!blocked && impact) defender.knockdownTime = defender.grounded ? 0.42 : 0.7;
       defender.flashTime = 0.1;
+      if (blocked) {
+        defender.guardMeter = clamp(defender.guardMeter - damage * 2.6, 0, 100);
+        if (defender.guardMeter <= 0) { defender.guarding = false; defender.stunTime = 1.05; defender.hurtTime = 0.42; defender.guardMeter = 42; }
+      }
       if (!blocked && impact) defender.stunTime = 0.35;
       attacker.drive = clamp(attacker.drive + (blocked ? 3 : 8), 0, 100);
+      attacker.superMeter = clamp(attacker.superMeter + (blocked ? 5 : impact ? 18 : 10), 0, 300);
+      defender.superMeter = clamp(defender.superMeter + (blocked ? 4 : 7), 0, 300);
       attacker.combo = attacker.comboWindow > 0 ? attacker.combo + 1 : 1;
       attacker.comboWindow = 0.8;
       shake = Math.max(shake, impact ? 13 : blocked ? 2 : 6);
+      hitStop = Math.max(hitStop, blocked ? 2 / 60 : impact ? 3 / 60 : 2 / 60);
+      impactFlash = Math.max(impactFlash, impact ? 0.16 : blocked ? 0.045 : 0.09);
+      combatCallout = blocked ? "GUARD" : counter ? "COUNTER HIT" : impact ? "HEAVY IMPACT" : attacker.combo > 2 ? `${attacker.combo} HIT CHAIN` : "CLEAN HIT";
+      combatCalloutTime = blocked ? 0.25 : impact || counter ? 0.68 : 0.42;
       burst(defender.x, defender.y - 112, blocked ? "#e8fbff" : color, blocked ? 6 : impact ? 22 : 12);
     };
 
-    const attackData = (type: NonNullable<Combatant["attack"]>) => ({
-      lightPunch: { activeA: 0.05, activeB: 0.125, end: 0.22, range: 72, damage: 5.2, force: 145 },
-      heavyPunch: { activeA: 0.13, activeB: 0.25, end: 0.43, range: 104, damage: 10.8, force: 270 },
-      lightKick: { activeA: 0.075, activeB: 0.165, end: 0.28, range: 88, damage: 6.4, force: 180 },
-      heavyKick: { activeA: 0.16, activeB: 0.29, end: 0.49, range: 122, damage: 12.2, force: 315 },
-      special: { activeA: 0.16, activeB: 0.32, end: 0.58, range: 138, damage: 14, force: 340 },
-      impact: { activeA: 0.23, activeB: 0.39, end: 0.62, range: 126, damage: 18, force: 430 },
-    }[type]);
+    const attackData = (type: NonNullable<Combatant["attack"]>) => {
+      const frames = {
+        lightPunch: { startup: 3, active: 4, recovery: 7, range: 72, damage: 4.8, force: 145, hitstun: 11, blockstun: 6 },
+        heavyPunch: { startup: 8, active: 6, recovery: 13, range: 104, damage: 11.2, force: 275, hitstun: 18, blockstun: 10 },
+        lightKick: { startup: 3, active: 5, recovery: 9, range: 90, damage: 6.2, force: 180, hitstun: 13, blockstun: 7 },
+        heavyKick: { startup: 8, active: 7, recovery: 15, range: 126, damage: 13.2, force: 320, hitstun: 20, blockstun: 11 },
+        special: { startup: 9, active: 10, recovery: 17, range: 142, damage: 14.5, force: 345, hitstun: 22, blockstun: 13 },
+        impact: { startup: 6, active: 8, recovery: 21, range: 132, damage: 18.5, force: 440, hitstun: 26, blockstun: 15 },
+        super: { startup: 7, active: 18, recovery: 24, range: 182, damage: 29, force: 520, hitstun: 32, blockstun: 18 },
+      }[type];
+      return { ...frames, activeA: frames.startup / 60, activeB: (frames.startup + frames.active) / 60, end: (frames.startup + frames.active + frames.recovery) / 60 };
+    };
+
+    const overlaps = (a: CombatBox, b: CombatBox) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+    const combatBoxes = (c: Combatant) => {
+      const bodyHeight = c.crouching ? 118 : 184;
+      const pushbox: CombatBox = { x: c.x - 34, y: c.y - bodyHeight, width: 68, height: bodyHeight };
+      const hurtboxes: CombatBox[] = [
+        { x: c.x - 39, y: c.y - bodyHeight, width: 78, height: bodyHeight * 0.58 },
+        { x: c.x - 32, y: c.y - bodyHeight * 0.44, width: 64, height: bodyHeight * 0.44 },
+      ];
+      const hitboxes: CombatBox[] = [];
+      if (c.attack) {
+        const data = attackData(c.attack);
+        if (c.attackTime >= data.activeA && c.attackTime <= data.activeB) {
+          const height = c.attack === "lightKick" || c.attack === "heavyKick" ? 58 : 48;
+          hitboxes.push({ x: c.facing === 1 ? c.x + 22 : c.x - data.range - 22, y: c.y - (c.attack === "heavyKick" ? 130 : 152), width: data.range, height });
+        }
+      }
+      const throwbox: CombatBox = { x: c.facing === 1 ? c.x + 20 : c.x - 74, y: c.y - 145, width: 54, height: 105 };
+      return { pushbox, hurtboxes, hitboxes, throwbox };
+    };
 
     const updateCombatant = (c: Combatant, foe: Combatant, move: number, wants: Record<string, boolean>, dt: number) => {
+      const previous = previousWants.get(c) ?? {};
+      const pressed = Object.fromEntries(Object.keys(wants).map((key) => [key, !!wants[key] && !previous[key]])) as Record<string, boolean>;
+      const requestedAttack = (): Combatant["attack"] => pressed.super ? "super" : pressed.impact ? "impact" : pressed.special ? "special" : pressed.heavyKick ? "heavyKick" : pressed.heavyPunch ? "heavyPunch" : pressed.lightKick ? "lightKick" : pressed.lightPunch ? "lightPunch" : null;
+      const freshAttack = requestedAttack();
+      if (freshAttack) { c.queuedAttack = freshAttack; c.queuedTime = 0.24; }
+      else { c.queuedTime = Math.max(0, c.queuedTime - dt); if (c.queuedTime === 0) c.queuedAttack = null; }
       c.facing = c.x < foe.x ? 1 : -1;
       c.hurtTime = Math.max(0, c.hurtTime - dt); c.stunTime = Math.max(0, c.stunTime - dt); c.flashTime = Math.max(0, c.flashTime - dt);
+      c.evadeTime = Math.max(0, c.evadeTime - dt); c.blockstunTime = Math.max(0, c.blockstunTime - dt); c.knockdownTime = Math.max(0, c.knockdownTime - dt);
+      c.invulnTime = Math.max(0, c.invulnTime - dt); c.dashTime = Math.max(0, c.dashTime - dt); c.maxModeTime = Math.max(0, c.maxModeTime - dt);
+      c.guardMeter = clamp(c.guardMeter + dt * (c.guarding ? 1.2 : 8), 0, 100);
       c.comboWindow = Math.max(0, c.comboWindow - dt); if (c.comboWindow === 0) c.combo = 0;
       c.drive = clamp(c.drive + dt * (c.guarding ? 1.5 : 5.5), 0, 100);
       c.crouching = wants.crouch && c.grounded && !c.attack;
-      c.guarding = wants.guard && c.grounded && !c.attack && c.hurtTime <= 0;
-      if (c.hurtTime <= 0 && c.stunTime <= 0 && !c.attack && roundState === "fight") {
+      c.guarding = (wants.guard || move === -c.facing) && c.grounded && !c.attack && c.hurtTime <= 0 && c.evadeTime <= 0 && c.knockdownTime <= 0;
+      if ((pressed.dashLeft || pressed.dashRight) && c.grounded && !c.attack && c.hurtTime <= 0 && c.stunTime <= 0) {
+        const dashDirection = pressed.dashLeft ? -1 : 1;
+        const backdash = dashDirection === -c.facing;
+        c.dashTime = backdash ? 0.2 : 0.24; c.invulnTime = backdash ? 8 / 60 : 0; c.vx = dashDirection * (backdash ? 570 : 690); c.guarding = false;
+      }
+      if (pressed.evade && c.grounded && !c.attack && c.hurtTime <= 0 && c.stunTime <= 0 && c.drive >= 10) { c.evadeTime = 0.36; c.drive -= 10; c.vx = c.facing * 520; c.guarding = false; burst(c.x, c.y - 55, c.fighter.color, 8); }
+      if (c.hurtTime <= 0 && c.stunTime <= 0 && c.blockstunTime <= 0 && c.knockdownTime <= 0 && c.evadeTime <= 0 && !c.attack && roundState === "fight") {
         const speed = (190 + c.fighter.speed * 16) * (c.crouching || c.guarding ? 0.22 : 1);
-        c.vx = lerp(c.vx, move * speed, 0.26);
-        if (wants.jump && c.grounded && !c.crouching && !c.guarding) { c.vy = -(550 + c.fighter.speed * 7); c.grounded = false; }
-        if (wants.lightPunch) startAttack(c, "lightPunch");
-        else if (wants.heavyPunch) startAttack(c, "heavyPunch");
-        else if (wants.lightKick) startAttack(c, "lightKick");
-        else if (wants.heavyKick) startAttack(c, "heavyKick");
-        else if (wants.special) startAttack(c, "special");
-        else if (wants.impact) startAttack(c, "impact");
+        if (c.dashTime <= 0) c.vx = lerp(c.vx, move * speed, 0.26);
+        if (pressed.jump && c.grounded && !c.guarding) {
+          const superJump = c === p1 && inputRing.slice(-8).some((frame) => frame.keys.includes("crouch"));
+          c.vy = -(superJump ? 710 : 550 + c.fighter.speed * 7); if (superJump && move) c.vx = move * 560; c.grounded = false; c.crouching = false;
+        }
+        if (c.queuedAttack && startAttack(c, c.queuedAttack)) { c.queuedAttack = null; c.queuedTime = 0; }
       } else if (c.hurtTime > 0 || c.stunTime > 0) c.guarding = false;
 
       if (c.attack) {
         c.attackTime += dt;
         const data = attackData(c.attack);
-        const isProjectileSpecial = c.attack === "special" && (c.fighter.style === "Zoner" || c.fighter.style === "Control");
-        if (!c.attackHit && !isProjectileSpecial && c.attackTime >= data.activeA && c.attackTime <= data.activeB && Math.abs(c.x - foe.x) < data.range + c.fighter.reach * 2 && Math.abs(c.y - foe.y) < 105) {
-          c.attackHit = true; hit(c, foe, data.damage + c.fighter.power * 0.42 + (c === p1 && c.attack === "special" ? comboBonus : 0), data.force, c.fighter.color, c.attack === "impact");
+        const isProjectileSpecial = c.attack === "special" || c.attack === "super";
+        const boxes = combatBoxes(c), foeBoxes = combatBoxes(foe);
+        if (!c.attackHit && !isProjectileSpecial && boxes.hitboxes.some((hitbox) => foeBoxes.hurtboxes.some((hurtbox) => overlaps(hitbox, hurtbox)))) {
+          c.attackHit = true; hit(c, foe, data.damage + c.fighter.power * 0.42 + (c === p1 && c.attack === comboAttack ? comboBonus : 0), data.force, c.fighter.color, c.attack === "impact" || c.attack === "super", data.hitstun, data.blockstun);
         }
-        if (c.attack === "special" && !isProjectileSpecial && c.attackTime < 0.34) c.vx += c.facing * 28;
-        if (c.attackTime >= data.end) { if (c === p1 && c.attack === "special") comboBonus = 0; c.attack = null; c.attackTime = 0; }
+        if ((c.attack === "special" || c.attack === "super") && !isProjectileSpecial && c.attackTime < 0.42) c.vx += c.facing * (c.attack === "super" ? 52 : 28);
+        const next = c.queuedAttack;
+        const rank = { lightPunch: 1, lightKick: 1, heavyPunch: 2, heavyKick: 2, impact: 3, special: 4, super: 5 };
+        const maxCancel = c.maxModeTime > 0 && rank[next ?? "lightPunch"] >= 2;
+        if (next && c.attackHit && c.comboWindow > 0 && (rank[next] > rank[c.attack] || maxCancel) && startAttack(c, next, true)) { c.queuedAttack = null; c.queuedTime = 0; }
+        else if (c.attackTime >= data.end) { if (c === p1 && c.attack === comboAttack) { comboBonus = 0; comboAttack = null; } c.attack = null; c.attackTime = 0; }
       }
 
       c.vy += 1450 * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.vx *= c.grounded ? 0.82 : 0.985;
       if (c.y >= FLOOR) { c.y = FLOOR; c.vy = 0; c.grounded = true; } else c.grounded = false;
       c.x = clamp(c.x, 82, W - 82);
+      c.state = c.knockdownTime > 0 ? "hardKnockdown" : c.blockstunTime > 0 ? "blockstun" : c.stunTime > 0 ? (c.grounded ? "hitstun" : "juggle") : c.attack ? "attacking" : c.dashTime > 0 ? "dashing" : c.guarding ? "blocking" : !c.grounded ? "jumping" : c.crouching ? "crouching" : Math.abs(c.vx) > 28 ? "walking" : c.maxModeTime > 0 ? "maxMode" : "idle";
+      previousWants.set(c, { ...wants });
     };
 
     const cpuWants = (dt: number) => {
       aiTimer -= dt;
       const distance = Math.abs(p1.x - p2.x);
       if (aiTimer <= 0) {
-        aiTimer = aiRate * (0.72 + Math.random() * 0.75);
+        aiTimer = aiRate * (0.9 + Math.random() * 0.85);
         const r = Math.random();
-        if (p2.health < 28 && r < 0.26) aiIntent = "guard";
-        else if (distance > 300) aiIntent = p2.fighter.style === "Zoner" && p2.drive >= 25 && r < 0.52 ? "special" : "approach";
-        else if (distance < 95) aiIntent = r < 0.18 ? "retreat" : r < 0.34 ? "guard" : r < 0.54 ? "lightPunch" : r < 0.72 ? "lightKick" : r < 0.88 ? "heavyKick" : p2.drive >= 32 ? "impact" : "jump";
-        else aiIntent = r < 0.24 ? "approach" : r < 0.43 ? "jump" : r < 0.62 ? "heavyPunch" : r < 0.78 ? "heavyKick" : p2.drive >= 25 ? "special" : "lightPunch";
+        if (p2.health < 28 && r < 0.42) aiIntent = "guard";
+        else if (distance > 330) aiIntent = r < 0.38 ? "idle" : r < 0.72 ? "approach" : p2.fighter.style === "Zoner" && p2.drive >= 25 ? "special" : "idle";
+        else if (distance < 105) aiIntent = r < 0.24 ? "idle" : r < 0.46 ? "retreat" : r < 0.62 ? "guard" : r < 0.76 ? "lightPunch" : r < 0.88 ? "lightKick" : "heavyKick";
+        else aiIntent = r < 0.32 ? "idle" : r < 0.52 ? "approach" : r < 0.68 ? "guard" : r < 0.79 ? "jump" : r < 0.9 ? "heavyPunch" : p2.drive >= 25 ? "special" : "lightKick";
       }
-      return { move: aiIntent === "approach" ? p2.facing : aiIntent === "retreat" ? -p2.facing : 0, jump: aiIntent === "jump", crouch: false, guard: aiIntent === "guard", lightPunch: aiIntent === "lightPunch", heavyPunch: aiIntent === "heavyPunch", lightKick: aiIntent === "lightKick", heavyKick: aiIntent === "heavyKick", special: aiIntent === "special", impact: aiIntent === "impact" };
+      return { move: aiIntent === "approach" ? p2.facing : aiIntent === "retreat" ? -p2.facing : 0, jump: aiIntent === "jump", crouch: false, guard: aiIntent === "guard", evade: false, lightPunch: aiIntent === "lightPunch", heavyPunch: aiIntent === "heavyPunch", lightKick: aiIntent === "lightKick", heavyKick: aiIntent === "heavyKick", special: aiIntent === "special", impact: aiIntent === "impact", super: false };
     };
 
     const resetRound = () => {
-      p1.x = 350; p1.y = FLOOR; p1.vx = p1.vy = 0; p1.health = 100; p1.drive = 65; p1.attack = null; p1.hurtTime = p1.stunTime = 0;
-      p2.x = 930; p2.y = FLOOR; p2.vx = p2.vy = 0; p2.health = 100; p2.drive = 65; p2.attack = null; p2.hurtTime = p2.stunTime = 0;
+      p1.x = 350; p1.y = FLOOR; p1.vx = p1.vy = 0; p1.health = 100; p1.drive = 65; p1.guardMeter = 100; p1.evadeTime = 0; p1.attack = null; p1.queuedAttack = null; p1.queuedTime = 0; p1.hurtTime = p1.stunTime = 0;
+      p2.x = 930; p2.y = FLOOR; p2.vx = p2.vy = 0; p2.health = 100; p2.drive = 65; p2.guardMeter = 100; p2.evadeTime = 0; p2.attack = null; p2.queuedAttack = null; p2.queuedTime = 0; p2.hurtTime = p2.stunTime = 0;
+      for (const combatant of [p1, p2]) { combatant.state = "idle"; combatant.blockstunTime = 0; combatant.knockdownTime = 0; combatant.invulnTime = 0; combatant.dashTime = 0; combatant.maxModeTime = 0; }
       projectiles.length = 0; particles.length = 0; timer = 75; roundState = "intro"; stateTimer = 1.15;
     };
 
     const update = (dt: number) => {
-      if (mode === "ONLINE" && role !== "host") { applyRemoteSnapshot(); return; }
+      impactFlash = Math.max(0, impactFlash - dt); combatCalloutTime = Math.max(0, combatCalloutTime - dt);
+      inputRing.push({ frame: ++simulationFrame, keys: Object.entries(inputs).filter(([, value]) => value === true).map(([key]) => key) });
+      if (inputRing.length > 30) inputRing.shift();
+      if (hitStop > 0) { hitStop = Math.max(0, hitStop - dt); return; }
+      if (mode === "ONLINE" && role !== "host") {
+        if (role === "spectator") { applyRemoteSnapshot(); return; }
+        // Player 2 immediately simulates their own controls between authoritative
+        // host snapshots. Each new snapshot reconciles the prediction.
+        applyRemoteSnapshot(true);
+        const predicted = { jump: !!inputs.jump, crouch: !!inputs.crouch, guard: !!inputs.guard, evade: !!inputs.evade, dashLeft: !!inputs.dashLeft, dashRight: !!inputs.dashRight, lightPunch: !!inputs.lightPunch, heavyPunch: !!inputs.heavyPunch, lightKick: !!inputs.lightKick, heavyKick: !!inputs.heavyKick, special: !!inputs.special, impact: !!inputs.impact, super: !!inputs.super };
+        const predictedMove = (inputs.left ? -1 : 0) + (inputs.right ? 1 : 0);
+        updateCombatant(p2, p1, predictedMove, predicted, dt);
+        p1.x = clamp(p1.x + p1.vx * dt, 82, W - 82);
+        p1.attackTime += p1.attack ? dt : 0;
+        return;
+      }
       if (roundState === "intro") { stateTimer -= dt; if (stateTimer <= 0) roundState = "fight"; }
       else if (roundState === "fight") timer = Math.max(0, timer - dt);
       else if (roundState === "ko") {
@@ -503,16 +802,25 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
         }
       }
 
-      comboCallout = Math.max(0, comboCallout - dt);
-      const local = { jump: !!inputs.jump, crouch: !!inputs.crouch, guard: !!inputs.guard, lightPunch: !!inputs.lightPunch, heavyPunch: !!inputs.heavyPunch, lightKick: !!inputs.lightKick, heavyKick: !!inputs.heavyKick, special: !!inputs.special, impact: !!inputs.impact };
+      comboCallout = Math.max(0, comboCallout - dt); finisherTime = Math.max(0, finisherTime - dt);
+      const local = { jump: !!inputs.jump, crouch: !!inputs.crouch, guard: !!inputs.guard, evade: !!inputs.evade, dashLeft: !!inputs.dashLeft, dashRight: !!inputs.dashRight, lightPunch: !!inputs.lightPunch, heavyPunch: !!inputs.heavyPunch, lightKick: !!inputs.lightKick, heavyKick: !!inputs.heavyKick, special: !!inputs.special, impact: !!inputs.impact, super: !!inputs.super };
       const localMove = (inputs.left ? -1 : 0) + (inputs.right ? 1 : 0);
       const remote = remoteInputRef.current ?? {};
-      const remoteWants = { move: (remote.left ? -1 : 0) + (remote.right ? 1 : 0), jump: !!remote.jump, crouch: !!remote.crouch, guard: !!remote.guard, lightPunch: !!remote.lightPunch, heavyPunch: !!remote.heavyPunch, lightKick: !!remote.lightKick, heavyKick: !!remote.heavyKick, special: !!remote.special, impact: !!remote.impact };
-      const ai = mode === "CPU" ? cpuWants(dt) : remoteWants;
-      updateCombatant(p1, p2, localMove, local, dt); updateCombatant(p2, p1, ai.move, ai, dt);
+      const remoteMove = (remote.left ? -1 : 0) + (remote.right ? 1 : 0);
+      const remoteWants: Record<string, boolean> = { jump: !!remote.jump, crouch: !!remote.crouch, guard: !!remote.guard, evade: !!remote.evade, dashLeft: !!remote.dashLeft, dashRight: !!remote.dashRight, lightPunch: false, heavyPunch: false, lightKick: false, heavyKick: false, special: false, impact: false, super: false };
+      const remoteSeq = Number(remote.actionSeq ?? -1);
+      const remoteAction = String(remote.action ?? "");
+      if (remoteSeq !== lastRemoteActionSeq && ["lightPunch", "heavyPunch", "lightKick", "heavyKick", "special", "impact", "super"].includes(remoteAction)) {
+        remoteWants[remoteAction] = true;
+        lastRemoteActionSeq = remoteSeq;
+      }
+      const ai = cpuWants(dt);
+      const { move: aiMove, ...aiWants } = ai;
+      updateCombatant(p1, p2, localMove, local, dt);
+      updateCombatant(p2, p1, mode === "CPU" ? aiMove : remoteMove, mode === "CPU" ? aiWants : remoteWants, dt);
 
-      const gap = Math.abs(p1.x - p2.x);
-      if (gap < 86 && Math.abs(p1.y - p2.y) < 110) { const push = (86 - gap) * 0.5; p1.x -= p1.facing * push; p2.x -= p2.facing * push; }
+      const p1Push = combatBoxes(p1).pushbox, p2Push = combatBoxes(p2).pushbox;
+      if (overlaps(p1Push, p2Push)) { const overlapWidth = Math.min(p1Push.x + p1Push.width, p2Push.x + p2Push.width) - Math.max(p1Push.x, p2Push.x); p1.x -= p1.facing * overlapWidth * .5; p2.x -= p2.facing * overlapWidth * .5; }
 
       for (let i = projectiles.length - 1; i >= 0; i--) {
         const q = projectiles[i]; q.x += q.vx * dt; q.life -= dt;
@@ -531,16 +839,73 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
     };
 
     const drawCombatant = (c: Combatant) => {
-      const sprite = spriteCache.get(c.fighter.id)!;
       const attack = c.attack ? attackData(c.attack) : null;
       const reach = c.attack && attack && c.attackTime > attack.activeA * 0.75 && c.attackTime < attack.activeB ? (c.attack === "lightPunch" ? 18 : c.attack === "lightKick" ? 26 : c.attack === "impact" ? 44 : 34) : 0;
-      const bob = c.grounded ? Math.sin(performance.now() * 0.004) * 2 : 0;
+      const now = performance.now();
+      const bob = c.grounded ? Math.sin(now * 0.004) * 2 : 0;
       ctx.save(); ctx.translate(c.x + c.facing * reach, c.y + bob); ctx.scale(c.facing, 1);
+      ctx.fillStyle = "rgba(0,0,0,.42)"; ctx.beginPath(); ctx.ellipse(0, 2, c.fighter.kind === "monster" ? 78 : 58, 11, 0, 0, Math.PI * 2); ctx.fill();
+      if (c.maxModeTime > 0) { ctx.globalAlpha = .3 + Math.sin(now * .025) * .12; ctx.strokeStyle = c.fighter.color; ctx.shadowBlur = 28; ctx.shadowColor = c.fighter.color; ctx.lineWidth = 13; ctx.beginPath(); ctx.ellipse(0, -142, 92, 172, 0, 0, Math.PI * 2); ctx.stroke(); ctx.shadowBlur = 0; ctx.globalAlpha = 1; }
       if (c.guarding) { ctx.globalAlpha = 0.42; ctx.strokeStyle = c.fighter.color; ctx.lineWidth = 10; ctx.beginPath(); ctx.arc(6, -125, 88, -1.25, 1.25); ctx.stroke(); ctx.globalAlpha = 1; }
+      if (c.evadeTime > 0) ctx.globalAlpha = 0.42;
       if (c.flashTime > 0) ctx.globalCompositeOperation = "screen";
-      ctx.drawImage(sprite, -112, c.crouching ? -250 : -300, 224, c.crouching ? 250 : 300);
+      const attackProgress = c.attack && attack ? clamp(c.attackTime / attack.end, 0, 1) : 0;
+      const sprite = spriteSheets[c.fighter.id];
+      if (sprite?.complete && sprite.naturalWidth > 0) {
+        const moving = c.grounded && Math.abs(c.vx) > 30 && !c.attack && !c.guarding && c.hurtTime <= 0;
+        const frame = c.hurtTime > 0 ? 7 : c.guarding || c.evadeTime > 0 ? 6 : !c.grounded ? 3 : c.attack === "lightKick" || c.attack === "heavyKick" ? 5 : c.attack ? 4 : moving ? (Math.floor(now / 130) % 2 ? 1 : 2) : 0;
+        const cellW = sprite.naturalWidth / 4, cellH = sprite.naturalHeight / 2;
+        const sx = (frame % 4) * cellW, sy = Math.floor(frame / 4) * cellH;
+        const destH = c.fighter.id === "zara" ? 382 : 365;
+        const destW = destH * cellW / cellH;
+        const lean = c.hurtTime > 0 ? -0.08 : c.attack ? (frame === 5 ? -0.025 : 0.035) * Math.sin(Math.PI * attackProgress) : 0;
+        ctx.save(); ctx.rotate(lean);
+        if (c.crouching) { ctx.translate(0, 42); ctx.scale(1, .86); }
+        if (c.attack === "special" || c.attack === "super") {
+          ctx.globalAlpha = .34; ctx.strokeStyle = c.fighter.color; ctx.lineWidth = c.attack === "super" ? 13 : 8; ctx.beginPath(); ctx.ellipse(0, -destH * .48, destW * .3, destH * .48, 0, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1;
+        }
+        ctx.drawImage(sprite, sx, sy, cellW, cellH, -destW / 2, -destH, destW, destH);
+        ctx.restore();
+      } else {
+        const livePortrait = livePortraits.get(c.fighter.id);
+        if (livePortrait) {
+          const strike = Math.sin(Math.PI * attackProgress);
+          const moving = c.grounded && Math.abs(c.vx) > 28 && !c.attack && !c.guarding;
+          const destH = c.fighter.kind === "monster" ? 430 : c.fighter.kind === "youth" ? 350 : c.fighter.kind === "robot" ? 405 : 392;
+          const widthBoost = c.fighter.kind === "monster" ? 1.18 : c.fighter.kind === "youth" ? 1.28 : 1.48;
+          const destW = destH * livePortrait.width / livePortrait.height * widthBoost;
+          const punch = c.attack === "lightPunch" || c.attack === "heavyPunch" || c.attack === "impact";
+          const kick = c.attack === "lightKick" || c.attack === "heavyKick";
+          const special = c.attack === "special" || c.attack === "super";
+          const stretchX = 1 + (punch ? .14 : kick ? .2 : special ? .1 : 0) * strike;
+          const compressY = 1 - (kick ? .08 : punch ? .035 : 0) * strike;
+          const lean = c.hurtTime > 0 ? -.13 : punch ? .07 * strike : kick ? -.08 * strike : moving ? Math.sin(now * .016) * .025 : 0;
+          ctx.save();
+          if (c.evadeTime > 0 || special) {
+            for (let ghost = 2; ghost >= 1; ghost--) {
+              ctx.globalAlpha = (special ? .14 : .1) * ghost;
+              ctx.drawImage(livePortrait, -destW / 2 - ghost * 28, -destH, destW, destH);
+            }
+            ctx.globalAlpha = 1;
+          }
+          ctx.rotate(lean); ctx.scale(stretchX, compressY);
+          if (c.crouching) { ctx.translate(0, 42); ctx.scale(1, .86); }
+          if (special) {
+            ctx.shadowBlur = c.attack === "super" ? 34 : 22; ctx.shadowColor = c.fighter.color;
+            ctx.strokeStyle = c.fighter.color; ctx.lineWidth = c.attack === "super" ? 12 : 7; ctx.globalAlpha = .38;
+            ctx.beginPath(); ctx.ellipse(0, -destH * .48, destW * .72, destH * .48, 0, -.95, .95); ctx.stroke(); ctx.globalAlpha = 1;
+          }
+          ctx.drawImage(livePortrait, -destW / 2, -destH, destW, destH);
+          ctx.restore();
+        }
+      }
       ctx.restore();
       if (c.combo > 1) { ctx.fillStyle = c.fighter.color; ctx.font = "900 22px Arial"; ctx.textAlign = "center"; ctx.fillText(`${c.combo} HIT`, c.x, c.y - 330); }
+    };
+
+    const drawDebugBox = (box: CombatBox, color: string) => { ctx.globalAlpha = .24; ctx.fillStyle = color; ctx.fillRect(box.x, box.y, box.width, box.height); ctx.globalAlpha = .9; ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.strokeRect(box.x, box.y, box.width, box.height); ctx.globalAlpha = 1; };
+    const drawCombatBoxes = (c: Combatant) => {
+      const boxes = combatBoxes(c); drawDebugBox(boxes.pushbox, "#ffe14a"); boxes.hurtboxes.forEach((box) => drawDebugBox(box, "#42dfff")); boxes.hitboxes.forEach((box) => drawDebugBox(box, "#ff405c")); drawDebugBox(boxes.throwbox, "#c86cff");
     };
 
     const drawHud = () => {
@@ -552,6 +917,9 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       ctx.textBaseline = "alphabetic"; ctx.fillStyle = "#effcff"; ctx.font = "900 26px Arial"; ctx.textAlign = "left"; ctx.fillText(p1.fighter.name, 50, 48); ctx.textAlign = "right"; ctx.fillText(p2.fighter.name, W - 50, 48);
       drawBar(50, 62, 455, p1.health, p1.fighter.color); drawBar(W - 505, 62, 455, p2.health, p2.fighter.color, true);
       ctx.fillStyle = "#172039"; ctx.fillRect(50, 94, 360, 9); ctx.fillRect(W - 410, 94, 360, 9); ctx.fillStyle = p1.fighter.color; ctx.fillRect(50, 94, 360 * p1.drive / 100, 9); ctx.fillStyle = p2.fighter.color; ctx.fillRect(W - 50 - 360 * p2.drive / 100, 94, 360 * p2.drive / 100, 9);
+      ctx.fillStyle = "#1c2336"; ctx.fillRect(50, 108, 250, 4); ctx.fillRect(W - 300, 108, 250, 4); ctx.fillStyle = p1.guardMeter < 35 ? "#ff405c" : "#f1f5ff"; ctx.fillRect(50, 108, 250 * p1.guardMeter / 100, 4); ctx.fillStyle = p2.guardMeter < 35 ? "#ff405c" : "#f1f5ff"; ctx.fillRect(W - 50 - 250 * p2.guardMeter / 100, 108, 250 * p2.guardMeter / 100, 4);
+      for (let bar = 0; bar < 3; bar++) { const leftFill = clamp(p1.superMeter - bar * 100, 0, 100) / 100, rightFill = clamp(p2.superMeter - bar * 100, 0, 100) / 100; ctx.fillStyle = "#202844"; ctx.fillRect(50 + bar * 88, 119, 80, 6); ctx.fillRect(W - 130 - bar * 88, 119, 80, 6); ctx.fillStyle = p1.fighter.color; ctx.fillRect(50 + bar * 88, 119, 80 * leftFill, 6); ctx.fillStyle = p2.fighter.color; ctx.fillRect(W - 50 - bar * 88 - 80 * rightFill, 119, 80 * rightFill, 6); }
+      ctx.font = "800 10px Arial"; ctx.fillStyle = "#9ba9c5"; ctx.textAlign = "left"; ctx.fillText(p1.state.toUpperCase(), 50, 142); ctx.textAlign = "right"; ctx.fillText(p2.state.toUpperCase(), W - 50, 142);
       ctx.fillStyle = "#f5fbff"; ctx.textAlign = "center"; ctx.font = "900 38px Arial"; ctx.fillText(String(Math.ceil(timer)).padStart(2, "0"), W / 2, 75); ctx.font = "700 12px Arial"; ctx.fillStyle = "#9ba9c5"; ctx.fillText(`ROUND ${round}`, W / 2, 96);
       for (let i = 0; i < 2; i++) { ctx.fillStyle = i < p1.wins ? p1.fighter.color : "#26304a"; ctx.beginPath(); ctx.arc(444 + i * 20, 118, 6, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = i < p2.wins ? p2.fighter.color : "#26304a"; ctx.beginPath(); ctx.arc(W - 444 - i * 20, 118, 6, 0, Math.PI * 2); ctx.fill(); }
     };
@@ -560,13 +928,44 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       ctx.save();
       const sx = shake > 0.5 ? (Math.random() - 0.5) * shake : 0, sy = shake > 0.5 ? (Math.random() - 0.5) * shake * 0.5 : 0;
       ctx.translate(sx, sy); ctx.drawImage(background, 0, 0);
-      for (const q of projectiles) { ctx.globalAlpha = 0.28; ctx.fillStyle = q.color; ctx.beginPath(); ctx.arc(q.x, q.y, 34, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; ctx.fillStyle = "#f5ffff"; ctx.beginPath(); ctx.arc(q.x, q.y, 15, 0, Math.PI * 2); ctx.fill(); }
-      drawCombatant(p1); drawCombatant(p2);
-      for (const q of particles) { ctx.globalAlpha = clamp(q.life / q.maxLife, 0, 1); ctx.fillStyle = q.color; ctx.fillRect(q.x, q.y, q.size * 2.4, q.size); } ctx.globalAlpha = 1;
+      if (!reduceMotion && stage.id === "shibuya") { ctx.strokeStyle = "rgba(125,225,255,.22)"; ctx.lineWidth = 2; for (let i = 0; i < 38; i++) { const x = (i * 91 + performance.now() * .22) % W, y = (i * 67 + performance.now() * .48) % H; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 11, y + 27); ctx.stroke(); } }
+      if (!reduceMotion && stage.id === "steppe") { ctx.fillStyle = "rgba(239,252,255,.72)"; for (let i = 0; i < 42; i++) { const x = (i * 83 + performance.now() * .035 * (1 + i % 3)) % W, y = (i * 59 + performance.now() * .075) % H; ctx.beginPath(); ctx.arc(x, y, 1.5 + i % 3, 0, Math.PI * 2); ctx.fill(); } }
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      for (const q of projectiles) {
+        const direction = Math.sign(q.vx) || 1, pulse = 1 + Math.sin(performance.now() * .028 + q.x * .02) * .16;
+        const trail = ctx.createLinearGradient(q.x - direction * 125, q.y, q.x + direction * 22, q.y);
+        trail.addColorStop(0, "transparent"); trail.addColorStop(.54, `${q.color}55`); trail.addColorStop(1, q.color);
+        ctx.fillStyle = trail; ctx.beginPath(); ctx.moveTo(q.x - direction * 128, q.y); ctx.lineTo(q.x - direction * 20, q.y - 25 * pulse); ctx.lineTo(q.x + direction * 23, q.y); ctx.lineTo(q.x - direction * 20, q.y + 25 * pulse); ctx.closePath(); ctx.fill();
+        ctx.shadowBlur = 28; ctx.shadowColor = q.color; ctx.strokeStyle = q.color; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(q.x, q.y, 25 * pulse, 0, Math.PI * 2); ctx.stroke();
+        ctx.shadowBlur = 16; ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(q.x, q.y, 10 * pulse, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "#eaffff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(q.x - direction * 72, q.y + 5); ctx.lineTo(q.x - direction * 45, q.y - 10); ctx.lineTo(q.x - direction * 18, q.y + 7); ctx.lineTo(q.x + direction * 13, q.y - 3); ctx.stroke();
+      }
+      ctx.restore();
+      drawCombatant(p1); drawCombatant(p2); if (debugBoxes) { drawCombatBoxes(p1); drawCombatBoxes(p2); }
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      for (const q of particles) { const alpha = clamp(q.life / q.maxLife, 0, 1); ctx.globalAlpha = alpha; ctx.shadowBlur = 12; ctx.shadowColor = q.color; ctx.strokeStyle = q.color; ctx.lineWidth = Math.max(1.5, q.size * .55); ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x - q.vx * .035, q.y - q.vy * .035); ctx.stroke(); }
+      ctx.restore(); ctx.globalAlpha = 1; ctx.shadowBlur = 0;
       drawHud();
+      if (inputHistory.length) {
+        const recent = inputHistory.slice(-6).map((item) => item.key).join("  ›  ");
+        ctx.textAlign = "left"; ctx.font = "800 12px Arial"; ctx.fillStyle = "rgba(232,251,255,.74)";
+        ctx.fillText(`COMMAND MEMORY  //  ${recent}`, 50, H - 26);
+      }
+      if (impactFlash > 0) { ctx.globalAlpha = clamp(impactFlash * 2.8, 0, .32); ctx.fillStyle = "#f4ffff"; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+      if (combatCalloutTime > 0) {
+        ctx.textAlign = "center"; ctx.shadowBlur = 18; ctx.shadowColor = finisherColor; ctx.fillStyle = "#f4ffff"; ctx.font = "italic 950 24px Arial";
+        ctx.fillText(combatCallout, W / 2, 232); ctx.shadowBlur = 0;
+      }
       if (roundState === "intro") drawCenterText(`ROUND ${round}`, "FIGHT");
       if (roundState === "ko") drawCenterText("K.O.", p1.health > p2.health ? p1.fighter.name : p2.fighter.name);
-      if (comboCallout > 0) { ctx.textAlign = "center"; ctx.fillStyle = p1.fighter.color; ctx.font = "italic 900 32px Arial"; ctx.fillText(player.combo.name, W / 2, 175); ctx.font = "800 13px Arial"; ctx.fillStyle = "#eefcff"; ctx.fillText("SKILL COMBO ACTIVATED", W / 2, 198); }
+      if (comboCallout > 0) { ctx.textAlign = "center"; ctx.shadowBlur = 24; ctx.shadowColor = p1.fighter.color; ctx.fillStyle = p1.fighter.color; ctx.font = "italic 900 34px Arial"; ctx.fillText(activeComboName, W / 2, 175); ctx.shadowBlur = 0; ctx.font = "800 13px Arial"; ctx.fillStyle = "#eefcff"; ctx.fillText("PERFECT CHAIN — FINISHER DEPLOYED", W / 2, 200); }
+      if (finisherTime > 0) {
+        const pulse = .68 + Math.sin(performance.now() * .035) * .12;
+        ctx.globalAlpha = pulse; ctx.fillStyle = "#02030a"; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
+        ctx.fillStyle = finisherColor; ctx.fillRect(0, 132, W, 5); ctx.fillRect(0, 575, W, 5);
+        ctx.textAlign = "center"; ctx.fillStyle = "#f7fdff"; ctx.font = "italic 950 62px Arial"; ctx.fillText(finisherName, W / 2, 345);
+        ctx.fillStyle = finisherColor; ctx.font = "900 14px Arial"; ctx.fillText(`${player.name} // CINEMATIC FINISH`, W / 2, 380);
+      }
       ctx.restore();
     };
 
@@ -583,9 +982,74 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       draw(); if (mode === "ONLINE" && role === "host") onSnapshot(snapshot()); raf = requestAnimationFrame(loop);
     };
 
-    const keyMap: Record<string, string> = { KeyA: "left", KeyD: "right", KeyW: "jump", KeyS: "crouch", KeyT: "lightPunch", KeyY: "heavyPunch", KeyU: "lightKick", KeyK: "heavyKick", KeyL: "special", KeyO: "impact", Space: "guard" };
-    const comboKeys: Record<string, string> = { lightPunch: "T", heavyPunch: "Y", lightKick: "U", heavyKick: "K", special: "L" };
-    const onKey = (event: KeyboardEvent, down: boolean) => { const control = keyMap[event.code]; if (control && role !== "spectator") { event.preventDefault(); inputs[control] = down; if (down && !event.repeat && comboKeys[control]) recordAction(comboKeys[control]); sendInput({ ...inputs }); } };
+    const keyMap: Record<string, string> = { KeyA: "left", KeyD: "right", KeyW: "jump", KeyS: "crouch", KeyE: "evade", Space: "guard" };
+    const attackKeyMap: Record<string, NonNullable<Combatant["attack"]>> = { KeyU: "lightPunch", KeyI: "heavyPunch", KeyO: "lightKick", Semicolon: "heavyKick", KeyY: "lightPunch", KeyL: "heavyKick", KeyP: "super" };
+    const comboKeyMap: Record<string, string> = { KeyU: "U", KeyI: "I", KeyO: "O", Semicolon: ";", KeyY: "U", KeyL: ";" };
+    const direction = () => inputs.crouch ? inputs.left ? "DFL" : inputs.right ? "DFR" : "D" : inputs.left ? "L" : inputs.right ? "R" : "N";
+    const recordDirection = () => {
+      const now = performance.now(), key = direction();
+      while (directionHistory[0] && now - directionHistory[0].at > 950) directionHistory.shift();
+      if (key !== "N" && directionHistory.at(-1)?.key !== key) directionHistory.push({ key, at: now });
+    };
+    const hasMotion = (sequence: string[]) => {
+      const tail = directionHistory.slice(-sequence.length);
+      return tail.length === sequence.length && tail.every((item, index) => item.key === sequence[index]) && tail.at(-1)!.at - tail[0].at <= 850;
+    };
+    const resolveCommand = (base: NonNullable<Combatant["attack"]>) => {
+      const forward = p1.facing === 1 ? "R" : "L", diagonal = p1.facing === 1 ? "DFR" : "DFL";
+      const qcf = hasMotion(["D", forward]) || hasMotion(["D", diagonal]) || hasMotion(["D", diagonal, forward]);
+      const superMotion = hasMotion(["D", forward, "D", forward]) || hasMotion(["D", diagonal, forward, "D", diagonal, forward]);
+      const dp = hasMotion([forward, "D", forward]) || hasMotion([forward, "D", diagonal]);
+      const exPunch = (base === "heavyPunch" && !!inputs.lightPunch) || (base === "lightPunch" && !!inputs.heavyPunch);
+      if (exPunch && (qcf || p1.maxModeTime > 0) && (p1.superMeter >= 50 || p1.maxModeTime > 0)) {
+        if (p1.maxModeTime <= 0) p1.superMeter -= 50; combatCallout = "EX SPECIAL"; combatCalloutTime = .7; return "special" as const;
+      }
+      if ((base === "heavyPunch" || base === "heavyKick") && superMotion) return "super" as const;
+      if (base === "heavyPunch" && dp) return "impact" as const;
+      if (["lightPunch", "heavyPunch", "lightKick", "heavyKick"].includes(base) && qcf) return "special" as const;
+      if (base === "heavyKick" && (!!inputs.heavyPunch || !!inputs.right || !!inputs.left)) return "impact" as const;
+      return base;
+    };
+    const activateMaxMode = () => {
+      if (p1.superMeter < 100 || p1.maxModeTime > 0) return false;
+      p1.superMeter -= 100; p1.maxModeTime = 10; activeComboName = "MAX MODE"; comboCallout = 1.2; combatCallout = "HEAVY CANCELS ENABLED"; combatCalloutTime = 1.2; burst(p1.x, p1.y - 120, p1.fighter.color, 36); return true;
+    };
+    const pulseAction = (initialAction: NonNullable<Combatant["attack"]>, comboKey?: string) => {
+      if (((initialAction === "lightKick" && !!inputs.heavyKick) || (initialAction === "heavyKick" && !!inputs.lightKick)) && activateMaxMode()) return;
+      const comboAction = comboKey ? recordAction(comboKey) : null;
+      const action = comboAction ?? initialAction;
+      inputs[action] = true;
+      inputs.actionSeq = Number(inputs.actionSeq ?? 0) + 1;
+      inputs.action = action;
+      sendInput({ ...inputs });
+      window.setTimeout(() => { inputs[action] = false; sendInput({ ...inputs }); }, 72);
+    };
+    const onKey = (event: KeyboardEvent, down: boolean) => {
+      if (role === "spectator") return;
+      const control = keyMap[event.code];
+      const attack = attackKeyMap[event.code];
+      if (event.code === "KeyB" && down && !event.repeat) { debugBoxes = !debugBoxes; combatCallout = debugBoxes ? "4-BOX DEBUG ON" : "4-BOX DEBUG OFF"; combatCalloutTime = .7; return; }
+      if (!control && !attack) return;
+      event.preventDefault();
+      if (control) {
+        inputs[control] = down;
+        if (down && (control === "left" || control === "right")) {
+          const now = performance.now();
+          if (now - lastMoveTap[control] <= 260) {
+            const dashKey = control === "left" ? "dashLeft" : "dashRight"; inputs[dashKey] = true; window.setTimeout(() => { inputs[dashKey] = false; sendInput({ ...inputs }); }, 70);
+          }
+          lastMoveTap[control] = now;
+        }
+        if (control === "jump") { if (down) jumpPressedAt = performance.now(); else if (performance.now() - jumpPressedAt <= 70 && p1.vy < 0) p1.vy *= .56; }
+        if (["left", "right", "crouch"].includes(control)) recordDirection();
+        sendInput({ ...inputs });
+      } else if (down && !event.repeat && attack) {
+        attackPressedAt[event.code] = performance.now(); pulseAction(resolveCommand(attack), comboKeyMap[event.code]);
+      } else if (!down && attack) {
+        const released = resolveCommand(attack);
+        if (released !== attack && performance.now() - (attackPressedAt[event.code] ?? 0) > 45) pulseAction(released, comboKeyMap[event.code]);
+      }
+    };
     const keyDown = (e: KeyboardEvent) => onKey(e, true), keyUp = (e: KeyboardEvent) => onKey(e, false);
     window.addEventListener("keydown", keyDown, { passive: false }); window.addEventListener("keyup", keyUp, { passive: false });
     const visibility = () => { last = performance.now(); accumulator = 0; };
@@ -594,15 +1058,22 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
     return () => { running = false; cancelAnimationFrame(raf); window.removeEventListener("keydown", keyDown); window.removeEventListener("keyup", keyUp); document.removeEventListener("visibilitychange", visibility); };
   }, [cpu, difficulty, mode, onMatchEnd, onSnapshot, outfit, player, remoteInputRef, remoteStateRef, role, sendInput, stage]);
 
-  const setControl = (control: string, value: boolean) => { inputRef.current[control] = value; sendInput({ ...inputRef.current }); };
+  const setControl = (control: string, value: boolean) => {
+    inputRef.current[control] = value;
+    if (value && ["lightPunch", "heavyPunch", "lightKick", "heavyKick", "special", "impact", "super"].includes(control)) {
+      inputRef.current.actionSeq = Number(inputRef.current.actionSeq ?? 0) + 1;
+      inputRef.current.action = control;
+    }
+    sendInput({ ...inputRef.current });
+  }
 
   return (
     <div className="arena-wrap">
       <canvas ref={canvasRef} aria-label={`${player.name} versus ${cpu.name} fighting arena`} />
-      {mode === "ONLINE" && <div className="room-hud">{role === "spectator" ? "● WATCHING LIVE" : role === "host" ? "P1 // HOST" : "P2 // CHALLENGER"}</div>}
+      {mode === "ONLINE" && <div className="room-hud">{role === "spectator" ? "● WATCHING LIVE" : role === "host" ? "P1 // HOST · AUTHORITATIVE" : "P2 // CHALLENGER · INPUT PREDICTION"}</div>}
       {role !== "spectator" && <div className="touch-controls" aria-label="Touch controls">
-        <div className="touch-move"><TouchButton label="◀" control="left" setControl={setControl} /><TouchButton label="▲" control="jump" setControl={setControl} /><TouchButton label="▼" control="crouch" setControl={setControl} /><TouchButton label="▶" control="right" setControl={setControl} /></div>
-        <div className="touch-action"><TouchButton label="T" control="lightPunch" setControl={setControl} /><TouchButton label="Y" control="heavyPunch" setControl={setControl} /><TouchButton label="U" control="lightKick" setControl={setControl} /><TouchButton label="K" control="heavyKick" setControl={setControl} /><TouchButton label="L" control="special" setControl={setControl} /><TouchButton label="GD" control="guard" setControl={setControl} /></div>
+        <div className="touch-move"><TouchButton label="◀" control="left" setControl={setControl} /><TouchButton label="▲" control="jump" setControl={setControl} /><TouchButton label="▼" control="crouch" setControl={setControl} /><TouchButton label="▶" control="right" setControl={setControl} /><TouchButton label="EV" control="evade" setControl={setControl} /></div>
+        <div className="touch-action"><TouchButton label="LP" control="lightPunch" setControl={setControl} /><TouchButton label="HP" control="heavyPunch" setControl={setControl} /><TouchButton label="LK" control="lightKick" setControl={setControl} /><TouchButton label="HK" control="heavyKick" setControl={setControl} /><TouchButton label="SP" control="special" setControl={setControl} /><TouchButton label="GD" control="guard" setControl={setControl} /></div>
       </div>}
     </div>
   );
@@ -616,7 +1087,19 @@ function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, sta
   const sky = ctx.createLinearGradient(0, 0, 0, h); sky.addColorStop(0, "#050712"); sky.addColorStop(0.55, "#111a34"); sky.addColorStop(1, "#070912"); ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
   const glow = ctx.createRadialGradient(w / 2, 265, 20, w / 2, 265, 520); glow.addColorStop(0, `${stage.color}35`); glow.addColorStop(1, "transparent"); ctx.fillStyle = glow; ctx.fillRect(0, 0, w, h);
 
-  if (stage.motif === "skyline" || stage.motif === "harbour") {
+  if (stage.id === "stormmarket") {
+    ctx.fillStyle = "#3b2518"; ctx.fillRect(0, 210, w, 170); ctx.strokeStyle = "#d69b57"; ctx.lineWidth = 12;
+    for (let x = 55; x < w; x += 170) { ctx.beginPath(); ctx.moveTo(x, 160); ctx.lineTo(x, 380); ctx.stroke(); ctx.fillStyle = "#22140d"; ctx.fillRect(x + 35, 255, 62, 125); ctx.strokeStyle = stage.color; ctx.lineWidth = 4; ctx.strokeRect(x + 35, 255, 62, 125); }
+    ctx.globalAlpha = .22; ctx.fillStyle = "#fff2cf"; for (let i = 0; i < 7; i++) { ctx.beginPath(); ctx.arc(160 + i * 155, 230 - (i % 2) * 38, 26 + i * 3, 0, Math.PI * 2); ctx.fill(); } ctx.globalAlpha = 1;
+  } else if (stage.id === "solarplaza") {
+    ctx.fillStyle = "#3b2d24"; ctx.fillRect(0, 245, w, 145); ctx.fillStyle = "#b79873";
+    for (let x = 30; x < w; x += 155) { ctx.fillRect(x, 165, 38, 220); ctx.fillRect(x - 10, 155, 58, 18); ctx.strokeStyle = "#e9cfa5"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(x + 88, 300, 55, Math.PI, 0); ctx.stroke(); }
+  } else if (stage.id === "prismmetro") {
+    ctx.fillStyle = "#121f36"; ctx.fillRect(0, 170, w, 220); for (let x = 75; x < w; x += 190) { const tube = ctx.createLinearGradient(x, 0, x + 85, 0); tube.addColorStop(0, "#263b61"); tube.addColorStop(.5, `${stage.color}77`); tube.addColorStop(1, "#263b61"); ctx.fillStyle = tube; ctx.fillRect(x, 205, 86, 170); ctx.strokeStyle = stage.accent; ctx.lineWidth = 3; ctx.strokeRect(x, 205, 86, 170); }
+  } else if (stage.id === "tidal") {
+    ctx.fillStyle = "#261018"; ctx.beginPath(); ctx.moveTo(0, 170); for (let x = 0; x <= w; x += 90) ctx.lineTo(x, 145 + (x % 180 ? 100 : 20)); ctx.lineTo(w, 390); ctx.lineTo(0, 390); ctx.fill();
+    const lava = ctx.createLinearGradient(0, 340, 0, 420); lava.addColorStop(0, "#ffdc4a"); lava.addColorStop(.45, "#ff5a23"); lava.addColorStop(1, "#4d1118"); ctx.fillStyle = lava; ctx.fillRect(0, 342, w, 48); ctx.fillStyle = "#fff3a0"; ctx.globalAlpha = .55; for (let x = 40; x < w; x += 135) ctx.fillRect(x, 352 + (x % 3) * 5, 75, 5); ctx.globalAlpha = 1;
+  } else if (stage.motif === "skyline" || stage.motif === "harbour") {
     for (let x = 0; x < w; x += 52) { const bh = 80 + ((x * 17) % 150); ctx.fillStyle = x % 104 === 0 ? "#172849" : "#101a33"; ctx.fillRect(x, 350 - bh, 42, bh); ctx.fillStyle = stage.accent; ctx.globalAlpha = 0.25; for (let y = 280; y < 345; y += 18) ctx.fillRect(x + 9, y, 7, 4); ctx.globalAlpha = 1; }
     if (stage.motif === "harbour") { ctx.strokeStyle = stage.color; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(930, 340, 150, Math.PI, 0); ctx.stroke(); }
   } else if (stage.motif === "rail" || stage.motif === "metro") {
@@ -646,22 +1129,240 @@ function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, sta
   ctx.globalAlpha = 0.05; ctx.fillStyle = "#fff"; for (let y = 0; y < h; y += 4) ctx.fillRect(0, y, w, 1); ctx.globalAlpha = 1;
 }
 
-function buildSprite(fighter: Fighter, outfit: Outfit) {
+type RigPoint = { x: number; y: number };
+
+function drawArticulatedFighter(ctx: CanvasRenderingContext2D, c: Combatant, outfit: Outfit, now: number, attackProgress: number) {
+  const f = c.fighter;
+  const youth = f.kind === "youth";
+  const robot = f.kind === "robot";
+  const monster = f.kind === "monster";
+  const elder = f.kind === "elder";
+  const heavy = monster || ["Grappler", "Armor", "Juggernaut"].includes(f.style);
+  const scale = monster ? 1.28 : youth ? 0.92 : elder ? 1.02 : heavy ? 1.16 : 1.09;
+  const moving = c.grounded && Math.abs(c.vx) > 28 && !c.attack && !c.guarding && c.hurtTime <= 0;
+  const stride = moving ? Math.sin(now * 0.018 + c.x * 0.012) : 0;
+  const breath = Math.sin(now * 0.0038 + c.x) * 2.5;
+  const strike = Math.sin(Math.PI * attackProgress);
+  const recover = Math.sin(Math.PI * clamp(attackProgress * 1.35, 0, 1));
+  const isPunch = c.attack === "lightPunch" || c.attack === "heavyPunch" || c.attack === "impact";
+  const isKick = c.attack === "lightKick" || c.attack === "heavyKick";
+  const isSpecial = c.attack === "special" || c.attack === "super";
+  const crouch = c.crouching ? 62 : 0;
+  const hurt = c.hurtTime > 0 ? clamp(c.hurtTime * 4, 0, 1) : 0;
+  const lean = isPunch ? 16 * strike : isKick ? -8 * strike : isSpecial ? 5 * strike : -24 * hurt;
+
+  ctx.save();
+  ctx.scale(scale, scale);
+  ctx.translate(0, crouch / scale);
+  ctx.filter = `drop-shadow(0 9px 5px rgba(0,0,0,.72)) drop-shadow(0 0 8px ${f.color})`;
+
+  ctx.save();
+  ctx.scale(1 / scale, 1 / scale);
+  ctx.fillStyle = "rgba(0,0,0,.46)";
+  ctx.beginPath(); ctx.ellipse(0, 1, heavy ? 70 : 56, 13, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+
+  const outline = "#050814";
+  const skin: Record<string, string> = { kael: "#d7a079", zara: "#71452f", atlas: "#b77b58", nyx: "#d3a78f", rio: "#a75e3e", sable: "#d3a18b", mara: "#b96d50", batu: "#a86e4e", lux: "#e1b099", oren: "#c89472", miko: "#e7b38d", teo: "#bd7b55", jun: "#d9a481", raku: "#c58c66" };
+  const skinColor = skin[f.id] ?? "#c98d68";
+  const dark = outfit.cut === "sleek" ? "#070b17" : outfit.cut === "heatwave" ? f.secondary : "#111827";
+  const boot = f.id === "atlas" ? "#a66d35" : f.id === "teo" ? "#24d4c3" : "#101522";
+
+  const segment = (a: RigPoint, b: RigPoint, widthA: number, widthB: number, color: string, glow = false) => {
+    const dx = b.x - a.x, dy = b.y - a.y, len = Math.max(1, Math.hypot(dx, dy));
+    const nx = -dy / len, ny = dx / len;
+    ctx.beginPath();
+    ctx.moveTo(a.x + nx * widthA, a.y + ny * widthA);
+    ctx.quadraticCurveTo((a.x + b.x) / 2 + nx * Math.max(widthA, widthB) * .22, (a.y + b.y) / 2 + ny * Math.max(widthA, widthB) * .22, b.x + nx * widthB, b.y + ny * widthB);
+    ctx.arc(b.x, b.y, widthB, Math.atan2(ny, nx), Math.atan2(-ny, -nx));
+    ctx.quadraticCurveTo((a.x + b.x) / 2 - nx * Math.max(widthA, widthB) * .22, (a.y + b.y) / 2 - ny * Math.max(widthA, widthB) * .22, a.x - nx * widthA, a.y - ny * widthA);
+    ctx.arc(a.x, a.y, widthA, Math.atan2(-ny, -nx), Math.atan2(ny, nx));
+    ctx.closePath(); ctx.fillStyle = color; ctx.strokeStyle = outline; ctx.lineWidth = 6; ctx.fill(); ctx.stroke();
+    if (glow) { ctx.strokeStyle = f.color; ctx.lineWidth = 2.5; ctx.globalAlpha = .8; ctx.stroke(); ctx.globalAlpha = 1; }
+  };
+  const joint = (p: RigPoint, radius: number, color: string) => { ctx.fillStyle = color; ctx.strokeStyle = outline; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(p.x, p.y, radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); };
+  const bridge = (p: RigPoint, radius: number, color: string) => { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(p.x, p.y, radius, 0, Math.PI * 2); ctx.fill(); };
+
+  const hipY = -112 + breath - lean * .12;
+  const shoulderY = -218 + breath + lean * .16;
+  const hipFront = { x: 25 + lean * .25, y: hipY };
+  const hipBack = { x: -24 + lean * .25, y: hipY + 3 };
+  let frontKnee = { x: 38 + stride * 27, y: -61 };
+  let frontFoot = { x: 42 + stride * 48, y: -8 };
+  let backKnee = { x: -42 - stride * 25, y: -66 };
+  let backFoot = { x: -45 - stride * 42, y: -7 };
+  if (!c.grounded) { frontKnee = { x: 42, y: -75 }; frontFoot = { x: 68, y: -43 }; backKnee = { x: -30, y: -65 }; backFoot = { x: -54, y: -28 }; }
+  if (isKick) {
+    const high = c.attack === "heavyKick" ? -116 : -82;
+    frontKnee = { x: lerp(42, 94, strike), y: lerp(-63, high - 18, strike) };
+    frontFoot = { x: lerp(45, 174, strike), y: lerp(-7, high, strike) };
+    backKnee = { x: -46, y: -58 }; backFoot = { x: -65, y: -5 };
+  }
+  if (c.guarding) { frontKnee.x = 48; frontFoot.x = 66; backKnee.x = -48; backFoot.x = -61; }
+  if (hurt) { frontFoot.x += 30 * hurt; backFoot.x -= 25 * hurt; }
+
+  const legWidth = monster ? 29 : heavy ? 23 : youth ? 16 : 19;
+  segment(hipBack, backKnee, legWidth + 3, legWidth, dark, robot); segment(backKnee, backFoot, legWidth, legWidth - 3, dark, robot); if (!robot) bridge(backKnee, legWidth - 2, dark);
+  segment(backFoot, { x: backFoot.x + 24, y: backFoot.y + 1 }, legWidth - 4, legWidth - 6, boot, robot);
+  segment(hipFront, frontKnee, legWidth + 3, legWidth, dark, robot); segment(frontKnee, frontFoot, legWidth, legWidth - 3, dark, robot); if (!robot) bridge(frontKnee, legWidth - 2, dark);
+  segment(frontFoot, { x: frontFoot.x + 28, y: frontFoot.y + 1 }, legWidth - 3, legWidth - 6, boot, robot);
+  if (robot) { joint(frontKnee, 11, f.secondary); joint(backKnee, 11, f.secondary); }
+
+  const shoulderFront = { x: 35 + lean, y: shoulderY };
+  const shoulderBack = { x: -34 + lean, y: shoulderY + 4 };
+  let frontElbow = { x: 58 + lean, y: -166 + breath };
+  let frontHand = { x: 38 + lean, y: -119 + breath };
+  let backElbow = { x: -58 + lean, y: -165 + breath };
+  let backHand = { x: -35 + lean, y: -126 + breath };
+  if (moving) { frontElbow.x -= stride * 31; frontHand.x -= stride * 48; backElbow.x += stride * 31; backHand.x += stride * 48; }
+  if (isPunch) {
+    const heavyPunch = c.attack === "heavyPunch" || c.attack === "impact";
+    frontElbow = { x: lerp(58, heavyPunch ? 102 : 112, strike), y: lerp(-166, -205, strike) };
+    frontHand = { x: lerp(38, heavyPunch ? 184 : 164, strike), y: lerp(-119, -211, strike) };
+    backElbow = { x: -54, y: -188 }; backHand = { x: -6, y: -211 };
+  } else if (isSpecial) {
+    frontElbow = { x: 74 * recover, y: lerp(-166, -239, strike) }; frontHand = { x: 112 * recover, y: lerp(-119, -276, strike) };
+    backElbow = { x: -65 * recover, y: lerp(-165, -230, strike) }; backHand = { x: -102 * recover, y: lerp(-126, -263, strike) };
+  } else if (c.guarding) {
+    frontElbow = { x: 61, y: -193 }; frontHand = { x: 20, y: -236 };
+    backElbow = { x: -43, y: -191 }; backHand = { x: 13, y: -176 };
+  } else if (hurt) {
+    frontElbow = { x: 64, y: -184 }; frontHand = { x: 96, y: -228 };
+    backElbow = { x: -66, y: -175 }; backHand = { x: -98, y: -207 };
+  }
+
+  const armWidth = monster ? 27 : heavy ? 21 : youth ? 13 : 17;
+  segment(shoulderBack, backElbow, armWidth + 2, armWidth, f.secondary, robot); segment(backElbow, backHand, armWidth, armWidth - 3, f.secondary, robot); if (!robot) bridge(backElbow, armWidth - 2, f.secondary); joint(backHand, armWidth - 2, robot ? f.secondary : skinColor);
+
+  const torsoTop = heavy ? 57 : youth ? 40 : 48, torsoBottom = heavy ? 43 : youth ? 30 : 36;
+  const chestGradient = ctx.createLinearGradient(-50, shoulderY, 55, hipY); chestGradient.addColorStop(0, f.color); chestGradient.addColorStop(1, f.secondary);
+  ctx.beginPath(); ctx.moveTo(shoulderBack.x - 7, shoulderY - 6); ctx.quadraticCurveTo(lean, shoulderY - 25, shoulderFront.x + 7, shoulderY - 6); ctx.quadraticCurveTo(lean + torsoTop + 10, -168, hipFront.x + torsoBottom, hipY); ctx.quadraticCurveTo(lean, hipY + 18, hipBack.x - torsoBottom, hipY); ctx.quadraticCurveTo(lean - torsoTop - 10, -168, shoulderBack.x - 7, shoulderY - 6); ctx.closePath();
+  ctx.fillStyle = chestGradient; ctx.strokeStyle = outline; ctx.lineWidth = 7; ctx.fill(); ctx.stroke();
+  ctx.globalAlpha = .45; ctx.strokeStyle = "#effcff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(lean, shoulderY - 14); ctx.lineTo(lean, hipY + 7); ctx.moveTo(-torsoTop * .55 + lean, -171); ctx.lineTo(torsoTop * .55 + lean, -171); ctx.stroke(); ctx.globalAlpha = 1;
+
+  if (["zara", "nyx", "sable", "batu", "lux", "oren", "raku"].includes(f.id)) {
+    ctx.fillStyle = dark; ctx.strokeStyle = outline; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(-39 + lean, hipY - 10); ctx.lineTo(-58 + lean - stride * 8, -37); ctx.lineTo(-3 + lean, -85); ctx.lineTo(16 + lean, -34); ctx.lineTo(43 + lean, hipY - 10); ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  if (["atlas", "batu"].includes(f.id)) { ctx.strokeStyle = "#e8c17a"; ctx.lineWidth = 7; for (let y = shoulderY + 30; y < hipY - 12; y += 25) { ctx.beginPath(); ctx.moveTo(-34 + lean, y); ctx.lineTo(35 + lean, y); ctx.stroke(); } }
+  if (f.id === "kael") { joint({ x: 30 + lean, y: -185 }, 12, "#ffdd72"); }
+  if (f.id === "sable") { ctx.strokeStyle = "#d62646"; ctx.lineWidth = 10; ctx.beginPath(); ctx.moveTo(-20 + lean, shoulderY - 13); ctx.quadraticCurveTo(-85, -187, -112 - stride * 20, -135); ctx.stroke(); }
+  if (f.id === "raku") { ctx.fillStyle = "#b87943"; ctx.strokeStyle = outline; ctx.lineWidth = 4; ctx.beginPath(); ctx.ellipse(55 + lean, -132, 15, 22, -.2, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+
+  const frontArmColor = f.id === "kael" ? "#f26b25" : f.color;
+  segment(shoulderFront, frontElbow, armWidth + 2, armWidth, frontArmColor, robot); segment(frontElbow, frontHand, armWidth, armWidth - 3, frontArmColor, robot); if (!robot) bridge(frontElbow, armWidth - 2, frontArmColor); joint(frontHand, armWidth - 2, robot ? f.secondary : skinColor);
+  if (robot) { joint(frontElbow, 10, f.secondary); joint(backElbow, 10, f.secondary); }
+
+  const neck = { x: lean * .55, y: shoulderY - 19 };
+  segment(neck, { x: neck.x, y: neck.y - 23 }, youth ? 11 : 14, youth ? 10 : 12, skinColor);
+  const headX = lean * .62 + (hurt ? -11 : 0), headY = shoulderY - 58 + breath * .25;
+  ctx.fillStyle = robot ? "#2455c6" : monster ? "#4c5149" : skinColor; ctx.strokeStyle = outline; ctx.lineWidth = 6; ctx.beginPath(); ctx.ellipse(headX, headY, youth ? 25 : heavy ? 32 : 28, youth ? 30 : 34, hurt * .18, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  if (robot) { ctx.strokeStyle = f.secondary; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(headX, headY, 18, 0, Math.PI * 2); ctx.stroke(); }
+  else if (monster) { ctx.fillStyle = "#ffd06a"; ctx.beginPath(); ctx.arc(headX - 10, headY, 4, 0, Math.PI * 2); ctx.arc(headX + 10, headY, 4, 0, Math.PI * 2); ctx.fill(); }
+  else {
+    ctx.fillStyle = f.id === "raku" ? "#eee7db" : f.id === "lux" ? "#e9d6c4" : "#151522"; ctx.beginPath(); ctx.arc(headX, headY - 6, youth ? 27 : 31, Math.PI, Math.PI * 2); ctx.lineTo(headX + 22, headY - 8); ctx.lineTo(headX + 12, headY - 18); ctx.lineTo(headX, headY - 7); ctx.lineTo(headX - 14, headY - 18); ctx.lineTo(headX - 25, headY - 4); ctx.closePath(); ctx.fill();
+    if (["nyx", "sable", "lux"].includes(f.id)) { ctx.fillStyle = f.id === "lux" ? "#b65cff" : "#101523"; ctx.fillRect(headX - 23, headY - 5, 46, 13); ctx.strokeStyle = f.color; ctx.lineWidth = 2; ctx.strokeRect(headX - 20, headY - 3, 40, 9); }
+    else { ctx.fillStyle = "#111521"; ctx.fillRect(headX - 17, headY - 2, 9, 3); ctx.fillRect(headX + 8, headY - 2, 9, 3); }
+    if (elder) { ctx.fillStyle = "#eee7db"; ctx.beginPath(); ctx.moveTo(headX - 19, headY + 9); ctx.quadraticCurveTo(headX, headY + 47, headX + 20, headY + 9); ctx.quadraticCurveTo(headX + 12, headY + 39, headX, headY + 31); ctx.quadraticCurveTo(headX - 12, headY + 39, headX - 19, headY + 9); ctx.fill(); }
+  }
+
+  if (isSpecial) { ctx.globalAlpha = .22 + strike * .34; ctx.strokeStyle = f.color; for (let ring = 0; ring < 3; ring++) { ctx.lineWidth = 5 - ring; ctx.beginPath(); ctx.arc(lean, -160, 72 + ring * 22 + strike * 15, -1.25, 1.25); ctx.stroke(); } ctx.globalAlpha = 1; }
+  ctx.restore();
+}
+
+type SpritePose = "idle" | "punch" | "kick" | "special" | "guard" | "hurt";
+
+function buildSprite(fighter: Fighter, outfit: Outfit, pose: SpritePose = "idle") {
   const c = document.createElement("canvas"); c.width = 224; c.height = 300; const x = c.getContext("2d")!;
-  const g = x.createLinearGradient(20, 20, 190, 280); g.addColorStop(0, fighter.color); g.addColorStop(1, fighter.secondary);
-  x.fillStyle = "rgba(0,0,0,.28)"; x.beginPath(); x.ellipse(112, 286, 74, 12, 0, 0, Math.PI * 2); x.fill();
-  x.fillStyle = g; x.strokeStyle = "#060813"; x.lineWidth = 8; x.lineJoin = "round";
-  x.beginPath(); x.moveTo(77, 124); x.lineTo(58, 204); x.lineTo(37, 279); x.lineTo(77, 279); x.lineTo(106, 200); x.lineTo(119, 130); x.closePath(); x.fill(); x.stroke();
-  x.beginPath(); x.moveTo(132, 132); x.lineTo(148, 208); x.lineTo(162, 279); x.lineTo(198, 279); x.lineTo(183, 197); x.lineTo(169, 118); x.closePath(); x.fill(); x.stroke();
-  x.beginPath(); x.moveTo(72, 92); x.quadraticCurveTo(112, 64, 165, 91); x.lineTo(175, 174); x.quadraticCurveTo(119, 206, 60, 169); x.closePath(); x.fill(); x.stroke();
-  if (outfit.cut === "sleek") { x.fillStyle = "#070a14"; x.beginPath(); x.moveTo(78, 92); x.lineTo(113, 155); x.lineTo(158, 92); x.lineTo(168, 164); x.lineTo(64, 164); x.closePath(); x.fill(); x.strokeStyle = fighter.color; x.lineWidth = 4; x.stroke(); }
-  if (outfit.cut === "heatwave") { x.fillStyle = "#070a14"; x.fillRect(67, 136, 100, 32); x.clearRect(88, 105, 50, 28); x.strokeStyle = fighter.color; x.lineWidth = 4; x.strokeRect(67, 136, 100, 32); }
-  x.beginPath(); x.moveTo(72, 105); x.lineTo(21, 177); x.lineTo(53, 190); x.lineTo(98, 133); x.closePath(); x.fill(); x.stroke();
-  x.beginPath(); x.moveTo(154, 102); x.lineTo(205, 157); x.lineTo(184, 183); x.lineTo(137, 135); x.closePath(); x.fill(); x.stroke();
-  x.beginPath(); x.arc(117, 56, fighter.style === "Grappler" ? 42 : 34, 0, Math.PI * 2); x.fill(); x.stroke();
-  x.fillStyle = "#effcff"; x.globalAlpha = 0.85; x.fillRect(91, 49, 55, 8); x.globalAlpha = 1;
-  if (fighter.style === "Zoner" || fighter.style === "Trickster") { x.strokeStyle = fighter.color; x.lineWidth = 9; x.beginPath(); x.moveTo(82, 62); x.quadraticCurveTo(15, 80, 30, 140); x.stroke(); }
-  if (fighter.style === "Grappler" || fighter.style === "Armor") { x.fillStyle = "#11182b"; x.fillRect(20, 160, 40, 38); x.fillRect(178, 151, 38, 38); }
-  x.fillStyle = "rgba(5,7,18,.6)"; x.font = "900 54px Arial"; x.textAlign = "center"; x.fillText(fighter.mark, 117, 150);
+  x.lineJoin = "round"; x.lineCap = "round";
+  x.fillStyle = "rgba(0,0,0,.34)"; x.beginPath(); x.ellipse(112, 287, fighter.kind === "monster" ? 92 : 70, 10, 0, 0, Math.PI * 2); x.fill();
+
+  const outline = "#050814";
+  const shade = outfit.cut === "sleek" ? "#090d19" : outfit.cut === "heatwave" ? "#25203a" : "#11182a";
+  const line = (points: Array<[number, number]>, width: number, color: string, inner = width - 8) => {
+    x.strokeStyle = outline; x.lineWidth = width; x.beginPath(); points.forEach(([px, py], index) => index ? x.lineTo(px, py) : x.moveTo(px, py)); x.stroke();
+    x.strokeStyle = color; x.lineWidth = Math.max(3, inner); x.beginPath(); points.forEach(([px, py], index) => index ? x.lineTo(px, py) : x.moveTo(px, py)); x.stroke();
+  };
+  const plate = (px: number, py: number, rx: number, ry: number, color: string | CanvasGradient) => { x.fillStyle = color; x.strokeStyle = outline; x.lineWidth = 6; x.beginPath(); x.ellipse(px, py, rx, ry, 0, 0, Math.PI * 2); x.fill(); x.stroke(); };
+
+  if (fighter.kind === "monster") {
+    const rocks: Array<[number, number, number, number]> = [[112,70,38,32],[82,112,38,34],[137,113,43,38],[65,163,37,48],[157,163,42,49],[88,211,38,52],[139,212,40,52],[62,260,35,25],[160,260,38,25]];
+    for (const [px,py,rx,ry] of rocks) { const g = x.createRadialGradient(px-10,py-12,4,px,py,rx); g.addColorStop(0,"#6b685d"); g.addColorStop(1,"#252925"); plate(px,py,rx,ry,g); }
+    x.strokeStyle = fighter.color; x.lineWidth = 5; x.globalAlpha = .85; for (const [px,py] of [[94,92],[128,139],[76,189],[145,226]]) { x.beginPath(); x.moveTo(px-12,py-9); x.lineTo(px,py+5); x.lineTo(px+13,py-8); x.stroke(); } x.globalAlpha = 1;
+    x.fillStyle = "#91bd62"; x.beginPath(); x.ellipse(112,42,48,10,0,0,Math.PI*2); x.fill(); x.fillStyle = "#ffd06a"; x.beginPath(); x.arc(97,67,5,0,Math.PI*2); x.arc(127,67,5,0,Math.PI*2); x.fill();
+    return c;
+  }
+
+  if (fighter.kind === "robot") {
+    line([[78,145],[65,203],[52,270]],31,"#2455c6"); line([[144,145],[157,203],[172,270]],31,"#2455c6");
+    line(pose === "punch" ? [[75,105],[40,112],[8,104]] : [[75,105],[47,158],[39,205]],28,"#357cff");
+    line(pose === "special" ? [[148,104],[177,81],[205,49]] : [[148,104],[182,157],[190,204]],28,"#357cff");
+    x.fillStyle = "#19449f"; x.strokeStyle = outline; x.lineWidth = 7; x.beginPath(); x.moveTo(69,91); x.lineTo(93,76); x.lineTo(136,76); x.lineTo(158,95); x.lineTo(150,166); x.lineTo(75,166); x.closePath(); x.fill(); x.stroke();
+    for (const [px,py] of [[68,204],[157,204],[48,157],[178,157]]) plate(px,py,13,13,"#78b8ff");
+    plate(112,58,35,35,"#224fb4"); x.strokeStyle = "#85e9ff"; x.lineWidth = 6; x.beginPath(); x.arc(112,58,20,0,Math.PI*2); x.stroke(); x.fillStyle = "#e9ffff"; x.beginPath(); x.arc(112,58,6,0,Math.PI*2); x.fill();
+    x.fillStyle = "#8beeff"; x.beginPath(); x.arc(112,119,12,0,Math.PI*2); x.fill();
+    return c;
+  }
+
+  const youth = fighter.kind === "youth";
+  const elder = fighter.kind === "elder";
+  const scale = youth ? .82 : elder ? .92 : 1;
+  const yShift = youth ? 48 : elder ? 22 : 0;
+  const bodyScale = ["Grappler", "Armor", "Juggernaut"].includes(fighter.style) ? 1.13 : ["Aerial", "Trickster", "Skirmisher"].includes(fighter.style) ? .93 : 1;
+  x.save(); x.translate(112, 292); x.scale(scale, scale); x.translate(-112, -292 + yShift); x.translate(112, 0); x.scale(bodyScale, 1); x.translate(-112, 0);
+  const skinColors: Record<string,string> = { kael:"#d7a079",zara:"#71452f",atlas:"#b77b58",nyx:"#d3a78f",rio:"#a75e3e",sable:"#d3a18b",mara:"#b96d50",batu:"#a86e4e",lux:"#e1b099",oren:"#c89472",miko:"#e7b38d",teo:"#bd7b55",jun:"#d9a481",raku:"#c58c66" };
+  const skin = skinColors[fighter.id] ?? "#c98d68";
+  const pants = outfit.cut === "heatwave" ? fighter.secondary : shade;
+  const coatIds = new Set(["zara","nyx","sable","batu","lux","oren","raku"]);
+  const armored = new Set(["atlas","batu"]);
+
+  if (coatIds.has(fighter.id)) {
+    x.fillStyle = fighter.id === "raku" ? "#296a68" : shade; x.strokeStyle = outline; x.lineWidth = 7; x.beginPath(); x.moveTo(70,118); x.lineTo(151,118); x.lineTo(181,272); x.lineTo(120,246); x.lineTo(103,272); x.lineTo(45,267); x.closePath(); x.fill(); x.stroke();
+    x.strokeStyle = fighter.color; x.lineWidth = 3; x.beginPath(); x.moveTo(78,124); x.lineTo(102,242); x.moveTo(143,124); x.lineTo(120,242); x.stroke();
+  }
+
+  const leftLeg: Array<[number,number]> = pose === "kick" ? [[92,174],[73,213],[24,196]] : [[92,170],[78,224],[67,278]];
+  const rightLeg: Array<[number,number]> = pose === "kick" ? [[132,173],[146,226],[173,274]] : [[132,170],[146,226],[160,278]];
+  line(leftLeg, youth ? 27 : 34, pants); line(rightLeg, youth ? 27 : 34, pants);
+  line([[leftLeg.at(-1)![0]-5,leftLeg.at(-1)![1]],[leftLeg.at(-1)![0]+15,leftLeg.at(-1)![1]]], youth ? 18 : 24, fighter.id === "atlas" ? "#a66d35" : "#141a28", youth ? 13 : 17);
+  line([[rightLeg.at(-1)![0]-7,rightLeg.at(-1)![1]],[rightLeg.at(-1)![0]+15,rightLeg.at(-1)![1]]], youth ? 18 : 24, fighter.id === "atlas" ? "#a66d35" : "#141a28", youth ? 13 : 17);
+
+  const torso = x.createLinearGradient(70,85,155,180); torso.addColorStop(0,fighter.color); torso.addColorStop(1,fighter.secondary);
+  x.fillStyle = torso; x.strokeStyle = outline; x.lineWidth = 8; x.beginPath(); x.moveTo(73,94); x.quadraticCurveTo(111,73,151,95); x.lineTo(158,171); x.quadraticCurveTo(112,192,65,170); x.closePath(); x.fill(); x.stroke();
+  if (armored.has(fighter.id)) { x.fillStyle = "rgba(9,12,20,.5)"; for (let row=0;row<3;row++) for (let col=0;col<3;col++) x.fillRect(78+col*23,105+row*19,18,13); }
+  else { x.strokeStyle = "rgba(245,255,255,.5)"; x.lineWidth = 3; x.beginPath(); x.moveTo(112,91); x.lineTo(112,171); x.moveTo(80,131); x.lineTo(145,131); x.stroke(); }
+
+  const leftArm: Array<[number,number]> = pose === "guard" ? [[76,105],[92,132],[103,89]] : pose === "hurt" ? [[76,105],[46,126],[31,102]] : [[76,105],[49,157],[38,205]];
+  const rightArm: Array<[number,number]> = pose === "punch" ? [[148,105],[181,109],[216,102]] : pose === "special" ? [[148,105],[177,76],[195,34]] : pose === "guard" ? [[148,105],[132,132],[120,91]] : [[148,105],[181,158],[188,204]];
+  line(leftArm, youth ? 24 : 31, fighter.id === "atlas" ? "#b38146" : fighter.color);
+  line(rightArm, youth ? 24 : 31, fighter.id === "kael" ? "#f26b25" : fighter.secondary);
+  plate(leftArm.at(-1)![0],leftArm.at(-1)![1],youth?10:13,youth?10:13,skin); plate(rightArm.at(-1)![0],rightArm.at(-1)![1],youth?10:13,youth?10:13,skin);
+
+  if (fighter.id === "miko") { x.fillStyle = "#ffd43b"; x.strokeStyle = outline; x.lineWidth = 5; x.beginPath(); x.arc(183,65,18,0,Math.PI*2); x.fill(); x.stroke(); x.fillStyle="#7ef1ff"; x.beginPath(); x.arc(183,65,6,0,Math.PI*2); x.fill(); }
+  if (fighter.id === "mara") { x.fillStyle = "#f3f1e8"; x.strokeStyle = fighter.color; x.lineWidth=4; x.beginPath(); x.moveTo(82,100); x.lineTo(112,122); x.lineTo(143,100); x.lineTo(135,146); x.lineTo(88,146); x.closePath(); x.fill(); x.stroke(); }
+  if (fighter.id === "lux") { x.fillStyle="rgba(255,255,255,.35)"; for(let i=0;i<4;i++){x.beginPath();x.moveTo(72+i*20,112);x.lineTo(88+i*20,134);x.lineTo(70+i*20,154);x.closePath();x.fill();} }
+  if (fighter.id === "oren") { x.fillStyle="#e9f7f4"; x.fillRect(103,96,15,78); x.strokeStyle=fighter.color; x.lineWidth=4; x.beginPath(); x.moveTo(65,151); x.lineTo(157,132); x.stroke(); }
+  if (fighter.id === "kael") { const reactor=x.createRadialGradient(151,116,2,151,116,18); reactor.addColorStop(0,"#fff"); reactor.addColorStop(.35,"#ffd06b"); reactor.addColorStop(1,"#ff4b1f"); plate(151,116,18,18,reactor); }
+  if (fighter.id === "atlas") { plate(70,101,27,17,"#b67938"); plate(154,101,27,17,"#b67938"); x.strokeStyle="#f4d6a0"; x.lineWidth=5; x.beginPath(); x.moveTo(76,116); x.lineTo(112,161); x.lineTo(149,116); x.stroke(); }
+  if (fighter.id === "rio") { x.strokeStyle="#d8ff47"; x.lineWidth=9; x.beginPath(); x.moveTo(71,126); x.quadraticCurveTo(28,142,18,184); x.stroke(); }
+  if (fighter.id === "sable") { x.strokeStyle="#d62646"; x.lineWidth=10; x.beginPath(); x.moveTo(91,78); x.quadraticCurveTo(55,93,34,142); x.stroke(); x.strokeStyle="#eef4ff"; x.lineWidth=5; x.beginPath(); x.moveTo(169,154); x.lineTo(211,75); x.stroke(); }
+  if (fighter.id === "batu") { x.fillStyle="#354b68"; x.strokeStyle=outline; x.lineWidth=5; for(let i=0;i<4;i++){x.fillRect(73+i*20,103,15,58);x.strokeRect(73+i*20,103,15,58);} }
+  if (fighter.id === "teo") { x.fillStyle="#24d4c3"; x.strokeStyle=outline; x.lineWidth=5; x.beginPath(); x.roundRect(54,270,116,15,8); x.fill(); x.stroke(); x.fillStyle="#e9ffff"; x.beginPath(); x.arc(72,287,7,0,Math.PI*2); x.arc(153,287,7,0,Math.PI*2); x.fill(); }
+  if (fighter.id === "jun") { x.fillStyle="rgba(241,245,255,.82)"; for(const [px,py] of [[48,78],[180,96],[34,154]]){x.beginPath();x.moveTo(px,py);x.lineTo(px+13,py+7);x.lineTo(px+4,py+12);x.lineTo(px-6,py+7);x.closePath();x.fill();} }
+  if (fighter.id === "raku") { x.fillStyle="#b87943"; x.strokeStyle=outline; x.lineWidth=5; x.beginPath(); x.ellipse(170,154,18,26,0,0,Math.PI*2); x.fill(); x.stroke(); }
+
+  plate(112,59, youth ? 27 : 33, youth ? 31 : 37, skin);
+  x.fillStyle = fighter.id === "lux" ? "#e9d6c4" : fighter.id === "raku" ? "#f2f0e7" : "#151522";
+  x.beginPath();
+  if (fighter.id === "zara") { x.arc(112,52,39,Math.PI,Math.PI*2); for(let i=0;i<5;i++) x.rect(78+i*15,48,7,48); }
+  else if (fighter.id === "raku") { x.arc(112,47,37,Math.PI,Math.PI*2); x.moveTo(80,50); x.quadraticCurveTo(57,74,70,101); x.moveTo(144,50); x.quadraticCurveTo(169,79,151,105); }
+  else { x.moveTo(79,57); x.quadraticCurveTo(82,12,113,24); x.quadraticCurveTo(151,14,147,64); x.lineTo(135,48); x.lineTo(124,60); x.lineTo(111,43); x.lineTo(98,59); x.closePath(); }
+  x.fill();
+  if (fighter.id === "nyx" || fighter.id === "sable") { x.fillStyle="#101523"; x.fillRect(82,55,60,22); x.strokeStyle=fighter.color; x.lineWidth=3; x.strokeRect(87,59,50,12); }
+  else if (fighter.id === "lux") { x.fillStyle="#b65cff"; x.beginPath(); x.moveTo(84,54); x.lineTo(104,46); x.lineTo(112,58); x.lineTo(121,46); x.lineTo(141,54); x.lineTo(131,70); x.lineTo(94,70); x.closePath(); x.fill(); }
+  else { x.fillStyle="#10121c"; x.fillRect(92,58,12,4); x.fillRect(121,58,12,4); }
+  if (elder) { x.fillStyle="#eee7db"; x.beginPath(); x.moveTo(89,73); x.quadraticCurveTo(112,111,137,73); x.quadraticCurveTo(130,125,112,118); x.quadraticCurveTo(91,123,89,73); x.fill(); }
+  if (pose === "special") { x.globalAlpha=.58; x.strokeStyle=fighter.color; x.lineWidth=4; for(let ring=0;ring<3;ring++){x.beginPath();x.arc(112,138,64+ring*17,-1.2,1.2);x.stroke();} x.globalAlpha=1; }
+  x.fillStyle = fighter.color; x.globalAlpha=.8; x.fillRect(98,116,28,7); x.globalAlpha=1;
+  x.restore();
   return c;
 }

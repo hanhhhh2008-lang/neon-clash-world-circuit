@@ -8,7 +8,7 @@ export type RoomConfig = {
   outfitId: string;
 };
 
-const FIGHTERS = new Set(["kael", "zara", "atlas", "nyx", "rio", "sable", "mara", "batu", "lux", "oren"]);
+const FIGHTERS = new Set(["kael", "zara", "atlas", "nyx", "rio", "sable", "mara", "batu", "lux", "oren", "axiom", "cinder", "miko", "teo", "jun", "raku"]);
 const STAGES = new Set(["shibuya", "hyperrail", "stormmarket", "aegis", "voidclub", "skycourt", "solarplaza", "steppe", "prismmetro", "tidal"]);
 const OUTFITS = new Set(["circuit", "afterdark", "heatwave"]);
 
@@ -17,29 +17,37 @@ export function db() {
   return env.DB;
 }
 
+let schemaPromise: Promise<unknown[]> | null = null;
+
 export async function ensureRoomSchema() {
-  const database = db();
-  await database.batch([
-    database.prepare(`CREATE TABLE IF NOT EXISTS rooms (
-      id TEXT PRIMARY KEY,
-      host_token TEXT NOT NULL,
-      guest_token TEXT,
-      config TEXT NOT NULL,
-      guest_input TEXT NOT NULL DEFAULT '{}',
-      state TEXT NOT NULL DEFAULT '{}',
-      status TEXT NOT NULL DEFAULT 'waiting',
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      host_seen INTEGER NOT NULL,
-      guest_seen INTEGER
-    )`),
-    database.prepare(`CREATE TABLE IF NOT EXISTS spectators (
-      token TEXT PRIMARY KEY,
-      room_id TEXT NOT NULL,
-      last_seen INTEGER NOT NULL
-    )`),
-    database.prepare("CREATE INDEX IF NOT EXISTS spectators_room_idx ON spectators(room_id, last_seen)"),
-  ]);
+  if (!schemaPromise) {
+    const database = db();
+    schemaPromise = database.batch([
+      database.prepare(`CREATE TABLE IF NOT EXISTS rooms (
+        id TEXT PRIMARY KEY,
+        host_token TEXT NOT NULL,
+        guest_token TEXT,
+        config TEXT NOT NULL,
+        guest_input TEXT NOT NULL DEFAULT '{}',
+        state TEXT NOT NULL DEFAULT '{}',
+        status TEXT NOT NULL DEFAULT 'waiting',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        host_seen INTEGER NOT NULL,
+        guest_seen INTEGER
+      )`),
+      database.prepare(`CREATE TABLE IF NOT EXISTS spectators (
+        token TEXT PRIMARY KEY,
+        room_id TEXT NOT NULL,
+        last_seen INTEGER NOT NULL
+      )`),
+      database.prepare("CREATE INDEX IF NOT EXISTS spectators_room_idx ON spectators(room_id, last_seen)"),
+    ]).catch((error) => {
+      schemaPromise = null;
+      throw error;
+    });
+  }
+  await schemaPromise;
 }
 
 export function validConfig(value: unknown): value is RoomConfig {
@@ -62,9 +70,17 @@ export function json(value: string | null, fallback: unknown = {}) {
 
 export function cleanInput(value: unknown) {
   const source = value && typeof value === "object" ? value as Record<string, unknown> : {};
-  const safe: Record<string, boolean> = {};
-  for (const key of ["left", "right", "jump", "crouch", "guard", "lightPunch", "heavyPunch", "lightKick", "heavyKick", "special", "impact"]) safe[key] = source[key] === true;
+  const safe: Record<string, boolean | number | string> = {};
+  for (const key of ["left", "right", "jump", "crouch", "guard", "evade"]) safe[key] = source[key] === true;
+  const action = String(source.action ?? "");
+  safe.action = ["lightPunch", "heavyPunch", "lightKick", "heavyKick", "special", "impact", "super"].includes(action) ? action : "";
+  safe.actionSeq = clampInteger(source.actionSeq, 0, 2_147_483_647);
   return safe;
+}
+
+function clampInteger(value: unknown, min: number, max: number) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.max(min, Math.min(max, Math.floor(parsed))) : min;
 }
 
 export function safeState(value: unknown) {
