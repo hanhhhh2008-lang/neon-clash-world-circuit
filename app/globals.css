@@ -121,6 +121,11 @@ button { color: inherit; }
 .broadcast-strip strong { margin-left: auto; margin-right: 18px; color: var(--cyan); }
 .arena-wrap { position: relative; border: 1px solid var(--line); background: #050712; overflow: hidden; }
 .arena-wrap canvas { display: block; width: 100%; height: auto; aspect-ratio: 16/9; touch-action: none; }
+.combo-library { min-height: 66px; display: flex; align-items: stretch; gap: 7px; overflow-x: auto; padding: 9px 11px; border: 1px solid var(--line); border-top: 0; background: #050a17; scrollbar-color: var(--cyan) #11182a; }
+.combo-library > strong { flex: 0 0 118px; display: grid; place-items: center; padding: 8px; color: var(--cyan); border-right: 1px solid var(--line); font-size: 8px; line-height: 1.45; letter-spacing: .15em; text-align: center; }
+.combo-library > div { flex: 0 0 148px; display: grid; align-content: center; gap: 5px; padding: 8px 10px; border: 1px solid #273651; background: linear-gradient(135deg, rgba(39,244,255,.05), rgba(255,45,186,.04)); }
+.combo-library kbd { color: var(--acid); font-size: 9px; font-weight: 950; letter-spacing: .1em; }
+.combo-library span { color: #90a4c1; font-size: 7px; font-weight: 800; letter-spacing: .08em; white-space: nowrap; }
 .control-deck { min-height: 96px; border: 1px solid var(--line); border-top: 0; background: #080d1b; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto; align-items: center; padding: 12px 14px; gap: 20px; }
 .keyboard-map { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 8px 12px; }
 .keyboard-map > div { display: flex; align-items: center; gap: 6px; }

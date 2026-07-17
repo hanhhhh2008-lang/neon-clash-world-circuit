@@ -55,6 +55,9 @@ type Combatant = {
   wins: number;
 };
 
+type ComboAttack = NonNullable<Combatant["attack"]>;
+type ComboRoute = { name: string; sequence: string[]; finisher: ComboAttack; bonus: number; drive: number };
+
 type Projectile = { x: number; y: number; vx: number; life: number; owner: Combatant; color: string; damage: number };
 type Particle = { x: number; y: number; vx: number; vy: number; life: number; maxLife: number; color: string; size: number };
 type CombatantSnapshot = Omit<Combatant, "fighter" | "queuedAttack" | "queuedTime">;
@@ -105,6 +108,20 @@ const OUTFITS: Outfit[] = [
 
 const CONTROL_LABELS = [["A / D", "MOVE / BACK GUARD"], ["W / S", "JUMP / CROUCH"], ["Y", "LIGHT PUNCH"], ["U", "PUNCH"], ["I", "KICK"], ["L", "HEAVY KICK"], ["E", "EVASIVE ROLL"], ["SPACE", "GUARD"]];
 const COMMAND_LABELS = [["↓ ↘ → + Y/U/I/L", "LONG-RANGE SPECIAL"], ["→ ↓ ↘ + Y/U", "RISING COUNTER"], ["↓ ↘ → ×2 + U/L", "CINEMATIC SUPER"], ["U + L", "BLOWBACK"], ["Y → U → I → L", "CANCEL COMBO"], ["O / P", "SPECIAL / SUPER SHORTCUTS"]];
+const ADVANCED_COMBOS: ComboRoute[] = [
+  { name: "FLASHPOINT RUSH", sequence: ["Y", "Y", "U", "I"], finisher: "impact", bonus: 8, drive: 22 },
+  { name: "CROSSWIND BREAK", sequence: ["Y", "Y", "I", "L"], finisher: "heavyKick", bonus: 7, drive: 16 },
+  { name: "VOLT HAMMER", sequence: ["Y", "U", "U", "L"], finisher: "impact", bonus: 10, drive: 24 },
+  { name: "ORBITAL SWITCH", sequence: ["Y", "U", "L", "I"], finisher: "special", bonus: 12, drive: 28 },
+  { name: "PRISM DRIVER", sequence: ["Y", "I", "U", "U"], finisher: "special", bonus: 11, drive: 27 },
+  { name: "NIGHTFALL SWEEP", sequence: ["Y", "I", "L", "L"], finisher: "heavyKick", bonus: 9, drive: 18 },
+  { name: "TITAN ASCENT", sequence: ["U", "Y", "Y", "L"], finisher: "impact", bonus: 12, drive: 26 },
+  { name: "ZERO SIGNAL", sequence: ["U", "Y", "U", "I"], finisher: "special", bonus: 13, drive: 30 },
+  { name: "BLUE SKY CRUSH", sequence: ["U", "U", "I", "L"], finisher: "impact", bonus: 14, drive: 30 },
+  { name: "EVENT HORIZON", sequence: ["U", "I", "I", "L"], finisher: "super", bonus: 16, drive: 68 },
+  { name: "COMET BARRAGE", sequence: ["I", "Y", "Y", "U"], finisher: "special", bonus: 12, drive: 28 },
+  { name: "WORLD CIRCUIT FINALE", sequence: ["I", "U", "Y", "L"], finisher: "super", bonus: 18, drive: 72 },
+];
 
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -128,6 +145,73 @@ function portraitCropStyle(fighter: Fighter, compact: boolean) {
 
 function FighterPortrait({ fighter, compact = false }: { fighter: Fighter; compact?: boolean }) {
   return <span className={`fighter-portrait ${compact ? "compact" : "hero"} kind-${fighter.kind}`} style={portraitCropStyle(fighter, compact)} role="img" aria-label={`${fighter.name}, ${fighter.costume}`} />;
+}
+
+const COMBAT_PORTRAIT_EDGES = {
+  main: [0, 164, 323, 485, 642, 792, 939, 1088, 1240, 1388, 1536],
+  bonus: [0, 250, 545, 840, 1098, 1332, 1536],
+};
+
+function buildLiveCombatPortrait(fighter: Fighter, image: HTMLImageElement) {
+  const referenceWidth = 1536;
+  const edges = COMBAT_PORTRAIT_EDGES[fighter.portrait.sheet];
+  const scale = image.naturalWidth / referenceWidth;
+  const sx = Math.round(edges[fighter.portrait.index] * scale);
+  const right = Math.round(edges[fighter.portrait.index + 1] * scale);
+  const sw = Math.max(1, right - sx);
+  const canvas = document.createElement("canvas");
+  canvas.width = sw; canvas.height = image.naturalHeight;
+  const context = canvas.getContext("2d", { willReadFrequently: true })!;
+  context.drawImage(image, sx, 0, sw, image.naturalHeight, 0, 0, sw, image.naturalHeight);
+
+  const pixels = context.getImageData(0, 0, sw, image.naturalHeight);
+  const data = pixels.data, total = sw * image.naturalHeight;
+  const removed = new Uint8Array(total), queue = new Int32Array(total);
+  let head = 0, tail = 0;
+  const isBackdrop = (index: number) => {
+    const offset = index * 4, r = data[offset], g = data[offset + 1], b = data[offset + 2];
+    const high = Math.max(r, g, b), low = Math.min(r, g, b);
+    return high < 38 || (high < 74 && high - low < 20);
+  };
+  const enqueue = (index: number) => {
+    if (index < 0 || index >= total || removed[index] || !isBackdrop(index)) return;
+    removed[index] = 1; queue[tail++] = index;
+  };
+  for (let x = 0; x < sw; x++) { enqueue(x); enqueue((image.naturalHeight - 1) * sw + x); }
+  for (let y = 0; y < image.naturalHeight; y++) { enqueue(y * sw); enqueue(y * sw + sw - 1); }
+  while (head < tail) {
+    const index = queue[head++], x = index % sw;
+    if (x > 0) enqueue(index - 1);
+    if (x + 1 < sw) enqueue(index + 1);
+    enqueue(index - sw); enqueue(index + sw);
+  }
+  for (let index = 0; index < total; index++) {
+    const offset = index * 4;
+    if (removed[index]) data[offset + 3] = 0;
+    else {
+      const high = Math.max(data[offset], data[offset + 1], data[offset + 2]);
+      const low = Math.min(data[offset], data[offset + 1], data[offset + 2]);
+      if (high < 17 && high - low < 8) data[offset + 3] = 0;
+    }
+  }
+  const components = new Uint32Array(total);
+  let componentId = 0, largestId = 0, largestSize = 0;
+  for (let start = 0; start < total; start++) {
+    if (data[start * 4 + 3] === 0 || components[start]) continue;
+    componentId += 1; head = 0; tail = 0; queue[tail++] = start; components[start] = componentId;
+    while (head < tail) {
+      const index = queue[head++], x = index % sw;
+      for (const neighbor of [x > 0 ? index - 1 : -1, x + 1 < sw ? index + 1 : -1, index - sw, index + sw]) {
+        if (neighbor < 0 || neighbor >= total || components[neighbor] || data[neighbor * 4 + 3] === 0) continue;
+        components[neighbor] = componentId; queue[tail++] = neighbor;
+      }
+    }
+    if (tail > largestSize) { largestSize = tail; largestId = componentId; }
+  }
+  if (largestId) for (let index = 0; index < total; index++) if (components[index] !== largestId) data[index * 4 + 3] = 0;
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.putImageData(pixels, 0, 0);
+  return canvas;
 }
 
 function FighterCard({ fighter, selected, onClick }: { fighter: Fighter; selected: boolean; onClick: () => void }) {
@@ -313,6 +397,10 @@ export function NeonClash() {
         <section className="fight-screen">
           <div className="broadcast-strip"><span>LIVE</span><p>{stage.name} {"//"} {stage.descriptor}</p><strong>{stage.city} · {player.name} ↔ {cpu.name}</strong></div>
           <GameCanvas key={matchKey} player={player} cpu={cpu} stage={stage} outfit={outfit} difficulty={difficulty} mode={mode} role={room?.role ?? "host"} remoteInputRef={remoteInputRef} remoteStateRef={remoteStateRef} sendInput={sendInput} onSnapshot={publishSnapshot} onMatchEnd={setOutcome} />
+          <div className="combo-library" aria-label="Advanced attack combos">
+            <strong>12 ADVANCED COMBOS</strong>
+            {ADVANCED_COMBOS.map((combo) => <div key={combo.name}><kbd>{combo.sequence.join(" › ")}</kbd><span>{combo.name}</span></div>)}
+          </div>
           <div className="control-deck">
             <div className="keyboard-map">
               {CONTROL_LABELS.map(([key, action]) => <div key={action}><kbd>{key}</kbd><span>{action}</span></div>)}
@@ -404,16 +492,16 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
     for (const [id, src] of Object.entries({ kael: "/characters/kael-combat-sprites-v2.png", zara: "/characters/zara-combat-sprites-v2.png" })) {
       const image = new Image(); image.decoding = "async"; image.src = src; spriteSheets[id] = image;
     }
-    const illustratedSprites = new Map<string, Record<SpritePose, HTMLCanvasElement>>();
-    for (const fighter of [player, cpu]) {
-      illustratedSprites.set(fighter.id, {
-        idle: buildSprite(fighter, outfit, "idle"),
-        punch: buildSprite(fighter, outfit, "punch"),
-        kick: buildSprite(fighter, outfit, "kick"),
-        special: buildSprite(fighter, outfit, "special"),
-        guard: buildSprite(fighter, outfit, "guard"),
-        hurt: buildSprite(fighter, outfit, "hurt"),
-      });
+    const livePortraits = new Map<string, HTMLCanvasElement>();
+    for (const [sheet, src] of Object.entries({ main: "/characters/neon-clash-roster-concept.webp", bonus: "/characters/neon-clash-bonus-roster-concept.webp" }) as Array<[Fighter["portrait"]["sheet"], string]>) {
+      const image = new Image(); image.decoding = "async";
+      const prepare = () => {
+        for (const fighter of [player, cpu]) {
+          if (fighter.portrait.sheet === sheet && !spriteSheets[fighter.id]) livePortraits.set(fighter.id, buildLiveCombatPortrait(fighter, image));
+        }
+      };
+      image.onload = prepare; image.src = src;
+      if (image.complete && image.naturalWidth > 0) prepare();
     }
     const p1 = createCombatant(player, 350, 1);
     const p2 = createCombatant(cpu, 930, -1);
@@ -442,21 +530,27 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
     let lastAppliedRemoteSequence = -1;
     let remoteSnapshotReceivedAt = performance.now();
     let comboBonus = 0;
+    let comboAttack: Combatant["attack"] = null;
     let comboCallout = 0;
+    let activeComboName = player.combo.name;
     let finisherTime = 0;
     let finisherName = "";
     let finisherColor = player.color;
 
-    const recordAction = (key: string) => {
+    const recordAction = (key: string): Combatant["attack"] => {
       const now = performance.now(); inputHistory.push({ key, at: now });
-      while (inputHistory.length > 8 || (inputHistory[0] && now - inputHistory[0].at > 1200)) inputHistory.shift();
-      const sequence = player.combo.sequence;
-      const tail = inputHistory.slice(-sequence.length);
-      if (tail.length === sequence.length && tail.every((item, index) => item.key === sequence[index]) && tail[tail.length - 1].at - tail[0].at <= 1100) {
-        comboBonus = 12; comboCallout = 1.25; p1.drive = clamp(p1.drive + 18, 0, 100); inputHistory.length = 0;
-        return true;
+      while (inputHistory.length > 10 || (inputHistory[0] && now - inputHistory[0].at > 1700)) inputHistory.shift();
+      const routes: ComboRoute[] = [{ name: player.combo.name, sequence: player.combo.sequence, finisher: "special", bonus: 12, drive: 28 }, ...ADVANCED_COMBOS];
+      for (const route of routes) {
+        const tail = inputHistory.slice(-route.sequence.length);
+        if (tail.length === route.sequence.length && tail.every((item, index) => item.key === route.sequence[index]) && tail[tail.length - 1].at - tail[0].at <= 1550) {
+          comboBonus = route.bonus; comboAttack = route.finisher; comboCallout = 1.4; activeComboName = route.name;
+          const minimumDrive = route.finisher === "super" ? 65 : route.finisher === "impact" ? 32 : route.finisher === "special" ? 25 : 0;
+          p1.drive = clamp(Math.max(p1.drive + route.drive, minimumDrive), 0, 100); inputHistory.length = 0;
+          return route.finisher;
+        }
       }
-      return false;
+      return null;
     };
 
     const applyCombatantSnapshot = (target: Combatant, value: CombatantSnapshot) => {
@@ -502,13 +596,15 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       const costs = { lightPunch: 0, heavyPunch: 0, lightKick: 0, heavyKick: 0, special: 25, impact: 32, super: 65 };
       if (c.drive < costs[type]) return false;
       c.drive -= costs[type]; c.attack = type; c.attackTime = 0; c.attackHit = false; c.guarding = false;
+      if (c === p1 && comboBonus > 0 && type === comboAttack) { burst(c.x + c.facing * 55, c.y - 132, c.fighter.color, 28); finisherTime = .55; finisherName = activeComboName; finisherColor = c.fighter.color; shake = Math.max(shake, 14); }
       if (type === "special" || type === "super") {
-        burst(c.x + c.facing * 58, c.y - 126, c.fighter.color, type === "super" ? 46 : c === p1 && comboBonus > 0 ? 34 : 14);
-        if (type === "super" || (c === p1 && comboBonus > 0)) { finisherTime = type === "super" ? 1.55 : 1.15; finisherName = c.fighter.ultimate; finisherColor = c.fighter.color; shake = type === "super" ? 23 : 16; }
+        const comboFinisher = c === p1 && comboBonus > 0 && type === comboAttack;
+        burst(c.x + c.facing * 58, c.y - 126, c.fighter.color, type === "super" ? 46 : comboFinisher ? 34 : 14);
+        if (type === "super" || comboFinisher) { finisherTime = type === "super" ? 1.55 : 1.15; finisherName = type === "super" && !comboFinisher ? c.fighter.ultimate : activeComboName; finisherColor = c.fighter.color; shake = type === "super" ? 23 : 16; }
       }
       if (type === "special" || type === "super") {
         const rangedStyle = c.fighter.style === "Zoner" || c.fighter.style === "Control" || c.fighter.style === "Gadget";
-        projectiles.push({ x: c.x + c.facing * 76, y: c.y - 122, vx: c.facing * (type === "super" ? 760 : (rangedStyle ? 610 : 525) + c.fighter.reach * 10), life: type === "super" ? 2.35 : 1.95, owner: c, color: c.fighter.color, damage: (type === "super" ? 27 : rangedStyle ? 14 : 11) + c.fighter.power * 0.45 + (c === p1 ? comboBonus : 0) });
+        projectiles.push({ x: c.x + c.facing * 76, y: c.y - 122, vx: c.facing * (type === "super" ? 760 : (rangedStyle ? 610 : 525) + c.fighter.reach * 10), life: type === "super" ? 2.35 : 1.95, owner: c, color: c.fighter.color, damage: (type === "super" ? 27 : rangedStyle ? 14 : 11) + c.fighter.power * 0.45 + (c === p1 && type === comboAttack ? comboBonus : 0) });
       }
       return true;
     };
@@ -571,13 +667,13 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
         const data = attackData(c.attack);
         const isProjectileSpecial = c.attack === "special" || c.attack === "super";
         if (!c.attackHit && !isProjectileSpecial && c.attackTime >= data.activeA && c.attackTime <= data.activeB && Math.abs(c.x - foe.x) < data.range + c.fighter.reach * 2 && Math.abs(c.y - foe.y) < 105) {
-          c.attackHit = true; hit(c, foe, data.damage + c.fighter.power * 0.42 + (c === p1 && c.attack === "special" ? comboBonus : 0), data.force, c.fighter.color, c.attack === "impact" || c.attack === "super");
+          c.attackHit = true; hit(c, foe, data.damage + c.fighter.power * 0.42 + (c === p1 && c.attack === comboAttack ? comboBonus : 0), data.force, c.fighter.color, c.attack === "impact" || c.attack === "super");
         }
         if ((c.attack === "special" || c.attack === "super") && !isProjectileSpecial && c.attackTime < 0.42) c.vx += c.facing * (c.attack === "super" ? 52 : 28);
         const next = c.queuedAttack;
         const rank = { lightPunch: 1, lightKick: 1, heavyPunch: 2, heavyKick: 2, impact: 3, special: 4, super: 5 };
         if (next && c.attackHit && c.comboWindow > 0 && rank[next] > rank[c.attack] && startAttack(c, next, true)) { c.queuedAttack = null; c.queuedTime = 0; }
-        else if (c.attackTime >= data.end) { if (c === p1 && (c.attack === "special" || c.attack === "super")) comboBonus = 0; c.attack = null; c.attackTime = 0; }
+        else if (c.attackTime >= data.end) { if (c === p1 && c.attack === comboAttack) { comboBonus = 0; comboAttack = null; } c.attack = null; c.attackTime = 0; }
       }
 
       c.vy += 1450 * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.vx *= c.grounded ? 0.82 : 0.985;
@@ -682,14 +778,35 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
         ctx.drawImage(sprite, sx, sy, cellW, cellH, -destW / 2, -destH, destW, destH);
         ctx.restore();
       } else {
-        const pose: SpritePose = c.hurtTime > 0 ? "hurt" : c.guarding || c.evadeTime > 0 ? "guard" : c.attack === "lightKick" || c.attack === "heavyKick" ? "kick" : c.attack === "special" || c.attack === "super" ? "special" : c.attack ? "punch" : "idle";
-        const fallback = illustratedSprites.get(c.fighter.id)?.[pose];
-        if (fallback) {
-          const destH = c.fighter.kind === "monster" ? 390 : c.fighter.kind === "youth" ? 326 : 365;
-          const destW = destH * fallback.width / fallback.height;
+        const livePortrait = livePortraits.get(c.fighter.id);
+        if (livePortrait) {
+          const strike = Math.sin(Math.PI * attackProgress);
+          const moving = c.grounded && Math.abs(c.vx) > 28 && !c.attack && !c.guarding;
+          const destH = c.fighter.kind === "monster" ? 430 : c.fighter.kind === "youth" ? 350 : c.fighter.kind === "robot" ? 405 : 392;
+          const widthBoost = c.fighter.kind === "monster" ? 1.18 : c.fighter.kind === "youth" ? 1.28 : 1.48;
+          const destW = destH * livePortrait.width / livePortrait.height * widthBoost;
+          const punch = c.attack === "lightPunch" || c.attack === "heavyPunch" || c.attack === "impact";
+          const kick = c.attack === "lightKick" || c.attack === "heavyKick";
+          const special = c.attack === "special" || c.attack === "super";
+          const stretchX = 1 + (punch ? .14 : kick ? .2 : special ? .1 : 0) * strike;
+          const compressY = 1 - (kick ? .08 : punch ? .035 : 0) * strike;
+          const lean = c.hurtTime > 0 ? -.13 : punch ? .07 * strike : kick ? -.08 * strike : moving ? Math.sin(now * .016) * .025 : 0;
           ctx.save();
+          if (c.evadeTime > 0 || special) {
+            for (let ghost = 2; ghost >= 1; ghost--) {
+              ctx.globalAlpha = (special ? .14 : .1) * ghost;
+              ctx.drawImage(livePortrait, -destW / 2 - ghost * 28, -destH, destW, destH);
+            }
+            ctx.globalAlpha = 1;
+          }
+          ctx.rotate(lean); ctx.scale(stretchX, compressY);
           if (c.crouching) { ctx.translate(0, 42); ctx.scale(1, .86); }
-          ctx.drawImage(fallback, -destW / 2, -destH, destW, destH);
+          if (special) {
+            ctx.shadowBlur = c.attack === "super" ? 34 : 22; ctx.shadowColor = c.fighter.color;
+            ctx.strokeStyle = c.fighter.color; ctx.lineWidth = c.attack === "super" ? 12 : 7; ctx.globalAlpha = .38;
+            ctx.beginPath(); ctx.ellipse(0, -destH * .48, destW * .72, destH * .48, 0, -.95, .95); ctx.stroke(); ctx.globalAlpha = 1;
+          }
+          ctx.drawImage(livePortrait, -destW / 2, -destH, destW, destH);
           ctx.restore();
         }
       }
@@ -733,7 +850,7 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       drawHud();
       if (roundState === "intro") drawCenterText(`ROUND ${round}`, "FIGHT");
       if (roundState === "ko") drawCenterText("K.O.", p1.health > p2.health ? p1.fighter.name : p2.fighter.name);
-      if (comboCallout > 0) { ctx.textAlign = "center"; ctx.shadowBlur = 24; ctx.shadowColor = p1.fighter.color; ctx.fillStyle = p1.fighter.color; ctx.font = "italic 900 34px Arial"; ctx.fillText(player.combo.name, W / 2, 175); ctx.shadowBlur = 0; ctx.font = "800 13px Arial"; ctx.fillStyle = "#eefcff"; ctx.fillText("PERFECT CHAIN — FINISHER DEPLOYED", W / 2, 200); }
+      if (comboCallout > 0) { ctx.textAlign = "center"; ctx.shadowBlur = 24; ctx.shadowColor = p1.fighter.color; ctx.fillStyle = p1.fighter.color; ctx.font = "italic 900 34px Arial"; ctx.fillText(activeComboName, W / 2, 175); ctx.shadowBlur = 0; ctx.font = "800 13px Arial"; ctx.fillStyle = "#eefcff"; ctx.fillText("PERFECT CHAIN — FINISHER DEPLOYED", W / 2, 200); }
       if (finisherTime > 0) {
         const pulse = .68 + Math.sin(performance.now() * .035) * .12;
         ctx.globalAlpha = pulse; ctx.fillStyle = "#02030a"; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
@@ -781,8 +898,8 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       return base;
     };
     const pulseAction = (initialAction: NonNullable<Combatant["attack"]>, comboKey?: string) => {
-      const comboFinished = comboKey ? recordAction(comboKey) : false;
-      const action = comboFinished ? "special" : initialAction;
+      const comboAction = comboKey ? recordAction(comboKey) : null;
+      const action = comboAction ?? initialAction;
       inputs[action] = true;
       inputs.actionSeq = Number(inputs.actionSeq ?? 0) + 1;
       inputs.action = action;

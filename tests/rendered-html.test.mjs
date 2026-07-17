@@ -43,10 +43,17 @@ test("declares the requested keyboard controls and signature combos", async () =
   assert.match(source, /guardMeter/);
   assert.match(source, /queuedAttack/);
   assert.match(source, /LONG-RANGE SPECIAL/);
-  assert.match(source, /comboFinished \? "special"/);
+  assert.match(source, /comboAction \?\? initialAction/);
   assert.doesNotMatch(source, /const artSheets/);
-  assert.match(source, /illustratedSprites/);
+  assert.match(source, /buildLiveCombatPortrait/);
+  assert.match(source, /livePortraits/);
+  assert.doesNotMatch(source, /illustratedSprites/);
   assert.doesNotMatch(source, /else drawArticulatedFighter/);
+  const advancedComboBlock = source.match(/const ADVANCED_COMBOS:[\s\S]*?= \[([\s\S]*?)\n\];/);
+  assert.ok(advancedComboBlock);
+  assert.equal([...advancedComboBlock[1].matchAll(/name: "/g)].length, 12);
+  assert.match(source, /12 ADVANCED COMBOS/);
+  assert.match(source, /WORLD CIRCUIT FINALE/);
 });
 
 test("renders one clear fighter per selection tile", async () => {

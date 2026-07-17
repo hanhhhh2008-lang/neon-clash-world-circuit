@@ -45,6 +45,8 @@ export default function RootLayout({
       <head>
         <link rel="preload" href="/characters/kael-combat-sprites-v2.png" as="image" />
         <link rel="preload" href="/characters/zara-combat-sprites-v2.png" as="image" />
+        <link rel="preload" href="/characters/neon-clash-roster-concept.webp" as="image" />
+        <link rel="preload" href="/characters/neon-clash-bonus-roster-concept.webp" as="image" />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
