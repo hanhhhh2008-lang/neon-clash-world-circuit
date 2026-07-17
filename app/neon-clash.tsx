@@ -50,13 +50,15 @@ type Combatant = {
   comboWindow: number;
   guardMeter: number;
   evadeTime: number;
+  queuedAttack: Combatant["attack"];
+  queuedTime: number;
   wins: number;
 };
 
 type Projectile = { x: number; y: number; vx: number; life: number; owner: Combatant; color: string; damage: number };
 type Particle = { x: number; y: number; vx: number; vy: number; life: number; maxLife: number; color: string; size: number };
-type CombatantSnapshot = Omit<Combatant, "fighter">;
-type MatchSnapshot = { p1: CombatantSnapshot; p2: CombatantSnapshot; timer: number; round: number; roundState: "intro" | "fight" | "ko" | "done"; projectiles: Array<Omit<Projectile, "owner"> & { owner: 1 | 2 }> };
+type CombatantSnapshot = Omit<Combatant, "fighter" | "queuedAttack" | "queuedTime">;
+type MatchSnapshot = { sequence?: number; p1: CombatantSnapshot; p2: CombatantSnapshot; timer: number; round: number; roundState: "intro" | "fight" | "ko" | "done"; projectiles: Array<Omit<Projectile, "owner"> & { owner: 1 | 2 }> };
 type RoomRole = "host" | "guest" | "spectator";
 type InputFrame = Record<string, boolean | number | string>;
 type RoomSession = { id: string; token: string; role: RoomRole; players: number; spectators: number; status: string; hostOnline?: boolean; guestOnline?: boolean };
@@ -64,22 +66,22 @@ type RoomConfig = { playerId: string; cpuId: string; stageId: string; difficulty
 type OpenRoom = { id: string; players: number; status: string; config: RoomConfig };
 
 const FIGHTERS: Fighter[] = [
-  { id: "kael", name: "KAEL", alias: "SUN BREAKER", city: "SEOUL", style: "Rushdown", special: "Solar Rift", ultimate: "HELIOS OVERDRIVE", personality: "Driven · Protective · Impatient", bio: "A courier who weaponized an illegal solar prosthetic to protect his district.", costume: "Asymmetric techwear jacket · armored right sleeve · reactor sneakers", quote: "Speed is a decision.", color: "#ff7a28", secondary: "#1768ff", speed: 9, power: 6, reach: 6, mark: "K", kind: "human", portrait: { sheet: "main", index: 0 }, combo: { name: "SOLAR CHAIN", sequence: ["T", "T", "U", "L"] } },
-  { id: "zara", name: "ZARA", alias: "VOLT QUEEN", city: "LAGOS", style: "Pressure", special: "Thunder Step", ultimate: "QUEEN'S TEMPEST", personality: "Magnetic · Fearless · Theatrical", bio: "A grid engineer who dances through voltage surges and never enters quietly.", costume: "Conductive captain coat · braided crown · insulated gauntlets", quote: "Hear the storm arrive.", color: "#347cff", secondary: "#ff2dba", speed: 8, power: 7, reach: 5, mark: "Z", kind: "human", portrait: { sheet: "main", index: 1 }, combo: { name: "VOLTAGE RUSH", sequence: ["T", "U", "Y", "L"] } },
-  { id: "atlas", name: "ATLAS", alias: "IRON SAINT", city: "ATHENS", style: "Grappler", special: "Titan Break", ultimate: "OLYMPUS DESCENDS", personality: "Patient · Honorable · Immovable", bio: "A museum conservator who rebuilt ceremonial armor into a kinetic grappling rig.", costume: "Bronze muscle cuirass · white mantle · articulated greaves", quote: "The ground remembers.", color: "#ff9d3f", secondary: "#f4d6a0", speed: 4, power: 10, reach: 6, mark: "A", kind: "human", portrait: { sheet: "main", index: 2 }, combo: { name: "TITAN LOCK", sequence: ["Y", "K", "Y", "L"] } },
-  { id: "nyx", name: "NYX", alias: "VOID SIGNAL", city: "BERLIN", style: "Zoner", special: "Black Pulse", ultimate: "EVENT HORIZON", personality: "Private · Analytical · Dry-witted", bio: "A signal pirate who bends arena light with a coat woven from programmable mesh.", costume: "Hooded mesh trench · holographic half-mask · signal gloves", quote: "Distance is control.", color: "#9b6cff", secondary: "#32204f", speed: 6, power: 7, reach: 10, mark: "N", kind: "human", portrait: { sheet: "main", index: 3 }, combo: { name: "VOID CASCADE", sequence: ["U", "T", "Y", "L"] } },
-  { id: "rio", name: "RIO", alias: "SKYLINE KID", city: "SÃO PAULO", style: "Aerial", special: "Comet Kick", ultimate: "ORBITAL SAMBA", personality: "Joyful · Restless · Daring", bio: "A rooftop courier and capoeira showstopper who treats every wall like a launchpad.", costume: "Street-athletic layers · reinforced knees · neon high-tops", quote: "Gravity is optional.", color: "#d8ff47", secondary: "#24df9b", speed: 10, power: 5, reach: 6, mark: "R", kind: "human", portrait: { sheet: "main", index: 4 }, combo: { name: "COMET LADDER", sequence: ["U", "U", "K", "L"] } },
-  { id: "sable", name: "SABLE", alias: "NIGHT BLADE", city: "TOKYO", style: "Counter", special: "Zero Cut", ultimate: "MIDNIGHT VERDICT", personality: "Reserved · Precise · Compassionate", bio: "A forensic fencer who predicts attacks by reading breath, balance, and fabric movement.", costume: "Tailored urban shinobi coat · red scarf · plated half-mask", quote: "Your move. My opening.", color: "#efefff", secondary: "#d62646", speed: 8, power: 8, reach: 7, mark: "S", kind: "human", portrait: { sheet: "main", index: 5 }, combo: { name: "ZERO VERDICT", sequence: ["T", "K", "Y", "L"] } },
-  { id: "mara", name: "MARA", alias: "RED ORBIT", city: "MEXICO CITY", style: "Balanced", special: "Meteor Arc", ultimate: "AZTEC SUPERNOVA", personality: "Warm · Competitive · Unbreakable", bio: "An aerospace mechanic who fused lucha pageantry with zero-gravity training.", costume: "Embroidered flight jacket · orbital belt · impact boots", quote: "Burn bright. Hit hard.", color: "#ff405c", secondary: "#ff8b32", speed: 7, power: 8, reach: 7, mark: "M", kind: "human", portrait: { sheet: "main", index: 6 }, combo: { name: "ORBIT BREAK", sequence: ["T", "Y", "U", "L"] } },
-  { id: "batu", name: "BATU", alias: "STEPPE WALL", city: "ULAANBAATAR", style: "Armor", special: "Stone Wake", ultimate: "ETERNAL BLUE SKY", personality: "Stoic · Loyal · Surprisingly gentle", bio: "A rescue captain whose layered armor absorbs force and returns it through the earth.", costume: "Futuristic deel coat · lamellar shoulders · heavy riding boots", quote: "I do not move.", color: "#41d7bf", secondary: "#354b68", speed: 5, power: 9, reach: 5, mark: "B", kind: "human", portrait: { sheet: "main", index: 7 }, combo: { name: "STEPPE QUAKE", sequence: ["K", "Y", "K", "L"] } },
-  { id: "lux", name: "LUX", alias: "PRISM FOX", city: "PARIS", style: "Trickster", special: "Mirror Dash", ultimate: "KALEIDOSCOPE HEIST", personality: "Playful · Elegant · Unreadable", bio: "A stage illusionist who turns refractive fashion into decoys and impossible angles.", costume: "Prismatic couture trench · fox visor · split-tail trousers", quote: "Catch the afterimage.", color: "#ffdc4a", secondary: "#a947ff", speed: 9, power: 6, reach: 8, mark: "L", kind: "human", portrait: { sheet: "main", index: 8 }, combo: { name: "PRISM FEINT", sequence: ["T", "U", "K", "L"] } },
-  { id: "oren", name: "OREN", alias: "TIDE MONK", city: "SYDNEY", style: "Control", special: "Breaker Wave", ultimate: "SOUTHERN DELUGE", personality: "Calm · Wry · Relentless", bio: "A coastal medic who learned to redirect momentum like water around stone.", costume: "Layered ocean robes · wrapped forearms · split training boots", quote: "Breathe between impacts.", color: "#48a8ff", secondary: "#42f5c5", speed: 6, power: 7, reach: 9, mark: "O", kind: "human", portrait: { sheet: "main", index: 9 }, combo: { name: "TIDAL FORM", sequence: ["U", "Y", "K", "L"] } },
-  { id: "axiom", name: "AXIOM-7", alias: "BLUE STANDARD", city: "ORBITAL LAB", style: "Adaptive", special: "Vector Copy", ultimate: "PERFECT RECALL", personality: "Curious · Literal · Learning humor", bio: "A tournament training robot that entered the circuit to understand why humans fight for joy.", costume: "Cobalt segmented chassis · gyroscopic joints · expression-ring display", quote: "New pattern acquired.", color: "#3b7cff", secondary: "#9bdcff", speed: 7, power: 7, reach: 7, mark: "7", kind: "robot", portrait: { sheet: "bonus", index: 0 }, combo: { name: "MACHINE LEARNING", sequence: ["T", "Y", "U", "L"] } },
-  { id: "cinder", name: "CINDER", alias: "MOSS COLOSSUS", city: "KRAKATOA", style: "Juggernaut", special: "Magma Bloom", ultimate: "MOUNTAIN AWAKES", personality: "Gentle · Ancient · Easily amused", bio: "A volcanic guardian who mistakes the World Circuit for an elaborate friendship ritual.", costume: "Basalt plates · moss mantle · glowing magma seams", quote: "Small friends hit loudly.", color: "#ff6b32", secondary: "#6fa85a", speed: 3, power: 10, reach: 8, mark: "C", kind: "monster", portrait: { sheet: "bonus", index: 1 }, combo: { name: "FAULT LINE", sequence: ["Y", "K", "Y", "L"] } },
-  { id: "miko", name: "MIKO", alias: "SPARK MAKER", city: "OSAKA", style: "Gadget", special: "Drone Pop", ultimate: "BRIGHT IDEA BARRAGE", personality: "Inventive · Cheerful · Stubborn", bio: "A 12-year-old junior inventor competing in supervised exhibition matches with a safety drone.", costume: "Age-appropriate utility jacket · leggings · goggles · reinforced sneakers", quote: "I fixed it while you blinked!", color: "#ffd43b", secondary: "#42c7ff", speed: 8, power: 4, reach: 9, mark: "M", kind: "youth", portrait: { sheet: "bonus", index: 2 }, combo: { name: "TOOLBOX TANGO", sequence: ["T", "U", "T", "L"] } },
-  { id: "teo", name: "TEO", alias: "RAIL RUNNER", city: "MADRID", style: "Skirmisher", special: "Kickflip Arc", ultimate: "CITYWIDE WALL RIDE", personality: "Brave · Social · Overconfident", bio: "A 13-year-old skating champion in padded exhibition gear who fights through speed challenges.", costume: "Age-appropriate teal hoodie · padded trousers · gloves · high-tops", quote: "Bet you can't keep up.", color: "#24d4c3", secondary: "#1768ff", speed: 10, power: 4, reach: 6, mark: "T", kind: "youth", portrait: { sheet: "bonus", index: 3 }, combo: { name: "RAIL COMBO", sequence: ["U", "U", "K", "L"] } },
-  { id: "jun", name: "JUN", alias: "QUIET COMET", city: "SINGAPORE", style: "Technical", special: "Paper Crane", ultimate: "THOUSAND LESSONS", personality: "Thoughtful · Polite · Fiercely focused", bio: "A 14-year-old academy champion taking part in non-contact holographic circuit bouts.", costume: "Age-appropriate layered academy uniform · forearm pads · training shoes", quote: "Practice makes possibilities.", color: "#8ea8ff", secondary: "#f1f5ff", speed: 7, power: 5, reach: 8, mark: "J", kind: "youth", portrait: { sheet: "bonus", index: 4 }, combo: { name: "COMET LESSON", sequence: ["T", "K", "U", "L"] } },
-  { id: "raku", name: "RAKU", alias: "TIPSY SAGE", city: "CHENGDU", style: "Unorthodox", special: "Stagger Step", ultimate: "NINE-CUP MIRAGE", personality: "Mischievous · Wise · Generous", bio: "A 72-year-old tavern storyteller whose legendary drunken style is mostly theatre and perfect balance.", costume: "Weathered teal coat · loose training trousers · travel gourd · rope sash", quote: "I wobble. The world falls.", color: "#e4bb68", secondary: "#42a7a0", speed: 6, power: 7, reach: 7, mark: "R", kind: "elder", portrait: { sheet: "bonus", index: 5 }, combo: { name: "WANDERING CUP", sequence: ["Y", "U", "T", "L"] } },
+  { id: "kael", name: "KAEL", alias: "SUN BREAKER", city: "SEOUL", style: "Rushdown", special: "Solar Rift", ultimate: "HELIOS OVERDRIVE", personality: "Driven · Protective · Impatient", bio: "A courier who weaponized an illegal solar prosthetic to protect his district.", costume: "Asymmetric techwear jacket · armored right sleeve · reactor sneakers", quote: "Speed is a decision.", color: "#ff7a28", secondary: "#1768ff", speed: 9, power: 6, reach: 6, mark: "K", kind: "human", portrait: { sheet: "main", index: 0 }, combo: { name: "SOLAR CHAIN", sequence: ["Y", "Y", "U", "L"] } },
+  { id: "zara", name: "ZARA", alias: "VOLT QUEEN", city: "LAGOS", style: "Pressure", special: "Thunder Step", ultimate: "QUEEN'S TEMPEST", personality: "Magnetic · Fearless · Theatrical", bio: "A grid engineer who dances through voltage surges and never enters quietly.", costume: "Conductive captain coat · braided crown · insulated gauntlets", quote: "Hear the storm arrive.", color: "#347cff", secondary: "#ff2dba", speed: 8, power: 7, reach: 5, mark: "Z", kind: "human", portrait: { sheet: "main", index: 1 }, combo: { name: "VOLTAGE RUSH", sequence: ["Y", "U", "I", "L"] } },
+  { id: "atlas", name: "ATLAS", alias: "IRON SAINT", city: "ATHENS", style: "Grappler", special: "Titan Break", ultimate: "OLYMPUS DESCENDS", personality: "Patient · Honorable · Immovable", bio: "A museum conservator who rebuilt ceremonial armor into a kinetic grappling rig.", costume: "Bronze muscle cuirass · white mantle · articulated greaves", quote: "The ground remembers.", color: "#ff9d3f", secondary: "#f4d6a0", speed: 4, power: 10, reach: 6, mark: "A", kind: "human", portrait: { sheet: "main", index: 2 }, combo: { name: "TITAN LOCK", sequence: ["Y", "L", "U", "L"] } },
+  { id: "nyx", name: "NYX", alias: "VOID SIGNAL", city: "BERLIN", style: "Zoner", special: "Black Pulse", ultimate: "EVENT HORIZON", personality: "Private · Analytical · Dry-witted", bio: "A signal pirate who bends arena light with a coat woven from programmable mesh.", costume: "Hooded mesh trench · holographic half-mask · signal gloves", quote: "Distance is control.", color: "#9b6cff", secondary: "#32204f", speed: 6, power: 7, reach: 10, mark: "N", kind: "human", portrait: { sheet: "main", index: 3 }, combo: { name: "VOID CASCADE", sequence: ["U", "Y", "I", "L"] } },
+  { id: "rio", name: "RIO", alias: "SKYLINE KID", city: "SÃO PAULO", style: "Aerial", special: "Comet Kick", ultimate: "ORBITAL SAMBA", personality: "Joyful · Restless · Daring", bio: "A rooftop courier and capoeira showstopper who treats every wall like a launchpad.", costume: "Street-athletic layers · reinforced knees · neon high-tops", quote: "Gravity is optional.", color: "#d8ff47", secondary: "#24df9b", speed: 10, power: 5, reach: 6, mark: "R", kind: "human", portrait: { sheet: "main", index: 4 }, combo: { name: "COMET LADDER", sequence: ["I", "I", "U", "L"] } },
+  { id: "sable", name: "SABLE", alias: "NIGHT BLADE", city: "TOKYO", style: "Counter", special: "Zero Cut", ultimate: "MIDNIGHT VERDICT", personality: "Reserved · Precise · Compassionate", bio: "A forensic fencer who predicts attacks by reading breath, balance, and fabric movement.", costume: "Tailored urban shinobi coat · red scarf · plated half-mask", quote: "Your move. My opening.", color: "#efefff", secondary: "#d62646", speed: 8, power: 8, reach: 7, mark: "S", kind: "human", portrait: { sheet: "main", index: 5 }, combo: { name: "ZERO VERDICT", sequence: ["Y", "I", "U", "L"] } },
+  { id: "mara", name: "MARA", alias: "RED ORBIT", city: "MEXICO CITY", style: "Balanced", special: "Meteor Arc", ultimate: "AZTEC SUPERNOVA", personality: "Warm · Competitive · Unbreakable", bio: "An aerospace mechanic who fused lucha pageantry with zero-gravity training.", costume: "Embroidered flight jacket · orbital belt · impact boots", quote: "Burn bright. Hit hard.", color: "#ff405c", secondary: "#ff8b32", speed: 7, power: 8, reach: 7, mark: "M", kind: "human", portrait: { sheet: "main", index: 6 }, combo: { name: "ORBIT BREAK", sequence: ["Y", "U", "I", "L"] } },
+  { id: "batu", name: "BATU", alias: "STEPPE WALL", city: "ULAANBAATAR", style: "Armor", special: "Stone Wake", ultimate: "ETERNAL BLUE SKY", personality: "Stoic · Loyal · Surprisingly gentle", bio: "A rescue captain whose layered armor absorbs force and returns it through the earth.", costume: "Futuristic deel coat · lamellar shoulders · heavy riding boots", quote: "I do not move.", color: "#41d7bf", secondary: "#354b68", speed: 5, power: 9, reach: 5, mark: "B", kind: "human", portrait: { sheet: "main", index: 7 }, combo: { name: "STEPPE QUAKE", sequence: ["L", "Y", "U", "L"] } },
+  { id: "lux", name: "LUX", alias: "PRISM FOX", city: "PARIS", style: "Trickster", special: "Mirror Dash", ultimate: "KALEIDOSCOPE HEIST", personality: "Playful · Elegant · Unreadable", bio: "A stage illusionist who turns refractive fashion into decoys and impossible angles.", costume: "Prismatic couture trench · fox visor · split-tail trousers", quote: "Catch the afterimage.", color: "#ffdc4a", secondary: "#a947ff", speed: 9, power: 6, reach: 8, mark: "L", kind: "human", portrait: { sheet: "main", index: 8 }, combo: { name: "PRISM FEINT", sequence: ["Y", "I", "I", "L"] } },
+  { id: "oren", name: "OREN", alias: "TIDE MONK", city: "SYDNEY", style: "Control", special: "Breaker Wave", ultimate: "SOUTHERN DELUGE", personality: "Calm · Wry · Relentless", bio: "A coastal medic who learned to redirect momentum like water around stone.", costume: "Layered ocean robes · wrapped forearms · split training boots", quote: "Breathe between impacts.", color: "#48a8ff", secondary: "#42f5c5", speed: 6, power: 7, reach: 9, mark: "O", kind: "human", portrait: { sheet: "main", index: 9 }, combo: { name: "TIDAL FORM", sequence: ["I", "Y", "U", "L"] } },
+  { id: "axiom", name: "AXIOM-7", alias: "BLUE STANDARD", city: "ORBITAL LAB", style: "Adaptive", special: "Vector Copy", ultimate: "PERFECT RECALL", personality: "Curious · Literal · Learning humor", bio: "A tournament training robot that entered the circuit to understand why humans fight for joy.", costume: "Cobalt segmented chassis · gyroscopic joints · expression-ring display", quote: "New pattern acquired.", color: "#3b7cff", secondary: "#9bdcff", speed: 7, power: 7, reach: 7, mark: "7", kind: "robot", portrait: { sheet: "bonus", index: 0 }, combo: { name: "MACHINE LEARNING", sequence: ["Y", "U", "I", "L"] } },
+  { id: "cinder", name: "CINDER", alias: "MOSS COLOSSUS", city: "KRAKATOA", style: "Juggernaut", special: "Magma Bloom", ultimate: "MOUNTAIN AWAKES", personality: "Gentle · Ancient · Easily amused", bio: "A volcanic guardian who mistakes the World Circuit for an elaborate friendship ritual.", costume: "Basalt plates · moss mantle · glowing magma seams", quote: "Small friends hit loudly.", color: "#ff6b32", secondary: "#6fa85a", speed: 3, power: 10, reach: 8, mark: "C", kind: "monster", portrait: { sheet: "bonus", index: 1 }, combo: { name: "FAULT LINE", sequence: ["U", "L", "U", "L"] } },
+  { id: "miko", name: "MIKO", alias: "SPARK MAKER", city: "OSAKA", style: "Gadget", special: "Drone Pop", ultimate: "BRIGHT IDEA BARRAGE", personality: "Inventive · Cheerful · Stubborn", bio: "A 12-year-old junior inventor competing in supervised exhibition matches with a safety drone.", costume: "Age-appropriate utility jacket · leggings · goggles · reinforced sneakers", quote: "I fixed it while you blinked!", color: "#ffd43b", secondary: "#42c7ff", speed: 8, power: 4, reach: 9, mark: "M", kind: "youth", portrait: { sheet: "bonus", index: 2 }, combo: { name: "TOOLBOX TANGO", sequence: ["Y", "I", "Y", "L"] } },
+  { id: "teo", name: "TEO", alias: "RAIL RUNNER", city: "MADRID", style: "Skirmisher", special: "Kickflip Arc", ultimate: "CITYWIDE WALL RIDE", personality: "Brave · Social · Overconfident", bio: "A 13-year-old skating champion in padded exhibition gear who fights through speed challenges.", costume: "Age-appropriate teal hoodie · padded trousers · gloves · high-tops", quote: "Bet you can't keep up.", color: "#24d4c3", secondary: "#1768ff", speed: 10, power: 4, reach: 6, mark: "T", kind: "youth", portrait: { sheet: "bonus", index: 3 }, combo: { name: "RAIL COMBO", sequence: ["I", "I", "U", "L"] } },
+  { id: "jun", name: "JUN", alias: "QUIET COMET", city: "SINGAPORE", style: "Technical", special: "Paper Crane", ultimate: "THOUSAND LESSONS", personality: "Thoughtful · Polite · Fiercely focused", bio: "A 14-year-old academy champion taking part in non-contact holographic circuit bouts.", costume: "Age-appropriate layered academy uniform · forearm pads · training shoes", quote: "Practice makes possibilities.", color: "#8ea8ff", secondary: "#f1f5ff", speed: 7, power: 5, reach: 8, mark: "J", kind: "youth", portrait: { sheet: "bonus", index: 4 }, combo: { name: "COMET LESSON", sequence: ["Y", "L", "I", "L"] } },
+  { id: "raku", name: "RAKU", alias: "TIPSY SAGE", city: "CHENGDU", style: "Unorthodox", special: "Stagger Step", ultimate: "NINE-CUP MIRAGE", personality: "Mischievous · Wise · Generous", bio: "A 72-year-old tavern storyteller whose legendary drunken style is mostly theatre and perfect balance.", costume: "Weathered teal coat · loose training trousers · travel gourd · rope sash", quote: "I wobble. The world falls.", color: "#e4bb68", secondary: "#42a7a0", speed: 6, power: 7, reach: 7, mark: "R", kind: "elder", portrait: { sheet: "bonus", index: 5 }, combo: { name: "WANDERING CUP", sequence: ["U", "I", "Y", "L"] } },
 ];
 
 const STAGES: Stage[] = [
@@ -101,34 +103,36 @@ const OUTFITS: Outfit[] = [
   { id: "heatwave", name: "HEATWAVE", note: "Bold summer look", cut: "heatwave" },
 ];
 
-const CONTROL_LABELS = [["A / D", "MOVE / BACK GUARD"], ["W / S", "JUMP / CROUCH"], ["U", "LIGHT PUNCH"], ["I", "HEAVY PUNCH"], ["J", "LIGHT KICK"], ["K", "HEAVY KICK"], ["E", "EVASIVE ROLL"], ["SPACE", "GUARD"]];
-const COMMAND_LABELS = [["↓ ↘ → + U/J", "SIGNATURE SPECIAL"], ["→ ↓ ↘ + U/I", "RISING COUNTER"], ["↓ ↘ → ×2 + I", "CINEMATIC SUPER"], ["I + K", "BLOWBACK"], ["LIGHT → HEAVY → SPECIAL", "CANCEL CHAIN"], ["L / O / P", "TRAINING SHORTCUTS"]];
+const CONTROL_LABELS = [["A / D", "MOVE / BACK GUARD"], ["W / S", "JUMP / CROUCH"], ["Y", "LIGHT PUNCH"], ["U", "PUNCH"], ["I", "KICK"], ["L", "HEAVY KICK"], ["E", "EVASIVE ROLL"], ["SPACE", "GUARD"]];
+const COMMAND_LABELS = [["↓ ↘ → + Y/U/I/L", "LONG-RANGE SPECIAL"], ["→ ↓ ↘ + Y/U", "RISING COUNTER"], ["↓ ↘ → ×2 + U/L", "CINEMATIC SUPER"], ["U + L", "BLOWBACK"], ["Y → U → I → L", "CANCEL COMBO"], ["O / P", "SPECIAL / SUPER SHORTCUTS"]];
 
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 function createCombatant(fighter: Fighter, x: number, facing: 1 | -1): Combatant {
-  return { fighter, x, y: 566, vx: 0, vy: 0, facing, health: 100, drive: 65, grounded: true, crouching: false, guarding: false, attack: null, attackTime: 0, attackHit: false, hurtTime: 0, stunTime: 0, flashTime: 0, combo: 0, comboWindow: 0, guardMeter: 100, evadeTime: 0, wins: 0 };
+  return { fighter, x, y: 566, vx: 0, vy: 0, facing, health: 100, drive: 65, grounded: true, crouching: false, guarding: false, attack: null, attackTime: 0, attackHit: false, hurtTime: 0, stunTime: 0, flashTime: 0, combo: 0, comboWindow: 0, guardMeter: 100, evadeTime: 0, queuedAttack: null, queuedTime: 0, wins: 0 };
 }
 
 function portraitStyle(fighter: Fighter) {
   return { "--fighter": fighter.color, "--fighter-2": fighter.secondary } as React.CSSProperties;
 }
 
-function portraitCropStyle(fighter: Fighter) {
+function portraitCropStyle(fighter: Fighter, compact: boolean) {
   const total = fighter.portrait.sheet === "main" ? 10 : 6;
   const position = fighter.portrait.index / (total - 1) * 100;
   const image = fighter.portrait.sheet === "main" ? "/characters/neon-clash-roster-concept.webp" : "/characters/neon-clash-bonus-roster-concept.webp";
-  return { backgroundImage: `url(${image})`, backgroundPosition: `${position}% center` } as React.CSSProperties;
+  return compact
+    ? { backgroundImage: `url(${image})`, backgroundSize: `${total * 100}% auto`, backgroundPosition: `${position}% top` } as React.CSSProperties
+    : { backgroundImage: `url(${image})`, backgroundSize: "auto 100%", backgroundPosition: `${position}% center`, aspectRatio: fighter.portrait.sheet === "main" ? "153.6 / 757" : "256 / 768" } as React.CSSProperties;
 }
 
 function FighterPortrait({ fighter, compact = false }: { fighter: Fighter; compact?: boolean }) {
-  return <span className={`fighter-portrait ${compact ? "compact" : "hero"} kind-${fighter.kind}`} style={portraitCropStyle(fighter)} role="img" aria-label={`${fighter.name}, ${fighter.costume}`} />;
+  return <span className={`fighter-portrait ${compact ? "compact" : "hero"} kind-${fighter.kind}`} style={portraitCropStyle(fighter, compact)} role="img" aria-label={`${fighter.name}, ${fighter.costume}`} />;
 }
 
-function FighterCard({ fighter, selected, rival, onClick }: { fighter: Fighter; selected: boolean; rival: boolean; onClick: () => void }) {
+function FighterCard({ fighter, selected, onClick }: { fighter: Fighter; selected: boolean; onClick: () => void }) {
   return (
-    <button className={`fighter-card ${selected ? "is-selected" : ""} ${rival ? "is-rival" : ""}`} onClick={onClick} style={portraitStyle(fighter)} aria-pressed={selected}>
+    <button className={`fighter-card ${selected ? "is-selected" : ""}`} onClick={onClick} style={portraitStyle(fighter)} aria-pressed={selected} aria-label={`Select ${fighter.name}, ${fighter.alias}`}>
       <span className="fighter-number">{String(FIGHTERS.indexOf(fighter) + 1).padStart(2, "0")}</span>
       <FighterPortrait fighter={fighter} compact />
       <span className="fighter-card-copy"><strong>{fighter.name}</strong><small>{fighter.style}</small></span>
@@ -161,6 +165,8 @@ export function NeonClash() {
   const remoteStateRef = useRef<MatchSnapshot | null>(null);
   const roomRef = useRef<RoomSession | null>(null);
   const lastStatePush = useRef(0);
+  const statePushInFlight = useRef(false);
+  const autoJoinAttemptedRef = useRef(false);
 
   const applyRoomConfig = useCallback((config: RoomConfig) => {
     setPlayerId(config.playerId); setCpuId(config.cpuId); setStageId(config.stageId); setDifficulty(config.difficulty); setOutfitId(config.outfitId);
@@ -170,7 +176,11 @@ export function NeonClash() {
   useEffect(() => {
     const code = new URLSearchParams(window.location.search).get("room");
     if (!code) return;
-    const timer = window.setTimeout(() => { setMode("ONLINE"); setRoomCode(code.toUpperCase()); setLobbyOpen(true); }, 0);
+    const linkedCode = code.toUpperCase().slice(0, 6);
+    const timer = window.setTimeout(() => {
+      setMode("ONLINE"); setRoomCode(linkedCode); setLobbyOpen(true);
+      if (!autoJoinAttemptedRef.current && linkedCode.length === 6) { autoJoinAttemptedRef.current = true; void joinRoom(false, linkedCode); }
+    }, 0);
     return () => window.clearTimeout(timer);
   }, []);
 
@@ -187,7 +197,10 @@ export function NeonClash() {
   useEffect(() => {
     if (!room?.id || !room.token) return;
     let active = true;
+    let pollInFlight = false;
     const poll = async () => {
+      if (pollInFlight) return;
+      pollInFlight = true;
       try {
         const response = await fetch(`/api/rooms/${room.id}?token=${encodeURIComponent(room.token)}`, { cache: "no-store" });
         const data = await response.json();
@@ -197,8 +210,9 @@ export function NeonClash() {
         setRoom((current) => current ? { ...current, players: data.room.players, spectators: data.room.spectators, status: data.room.status, hostOnline: data.room.hostOnline, guestOnline: data.room.guestOnline } : current);
         if (room.role !== "host" && data.room.status === "fighting") { setLobbyOpen(false); setScreen("fight"); }
       } catch { if (active) setRoomError("ROOM CONNECTION INTERRUPTED — RETRYING"); }
+      finally { pollInFlight = false; }
     };
-    void poll(); const interval = window.setInterval(poll, room.role === "spectator" ? 120 : 55);
+    void poll(); const interval = window.setInterval(poll, room.role === "spectator" ? 180 : 90);
     return () => { active = false; window.clearInterval(interval); };
   }, [room?.id, room?.role, room?.token]);
 
@@ -213,7 +227,7 @@ export function NeonClash() {
     finally { setRoomBusy(false); }
   };
 
-  const joinRoom = async (watchOnly = false, selectedCode?: string) => {
+  async function joinRoom(watchOnly = false, selectedCode?: string) {
     const code = (selectedCode ?? roomCode).trim().toUpperCase(); if (!code) return;
     setRoomBusy(true); setRoomError("");
     try {
@@ -232,9 +246,11 @@ export function NeonClash() {
 
   const publishSnapshot = useCallback((snapshot: MatchSnapshot) => {
     const session = roomRef.current; const now = performance.now();
-    if (!session || session.role !== "host" || now - lastStatePush.current < 45) return;
+    if (!session || session.role !== "host" || statePushInFlight.current || now - lastStatePush.current < 80) return;
     lastStatePush.current = now;
-    void fetch(`/api/rooms/${session.id}/state`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: session.token, state: snapshot, status: snapshot.roundState === "done" ? "complete" : "fighting" }) });
+    statePushInFlight.current = true;
+    void fetch(`/api/rooms/${session.id}/state`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: session.token, state: snapshot, status: snapshot.roundState === "done" ? "complete" : "fighting" }) })
+      .finally(() => { statePushInFlight.current = false; });
   }, []);
 
   const randomRival = useCallback((exclude: string) => {
@@ -266,16 +282,14 @@ export function NeonClash() {
             <p className="intro">Humans, youth exhibition heroes, robots, monsters, and one famously tipsy master. Read every personality and finishing art before taking the circuit live.</p>
           </div>
 
-          <div className="versus-preview">
+          <div className="versus-preview solo-preview">
             <FighterPanel fighter={player} outfit={outfit} side="player" />
-            <div className="vs-spine"><span>ROUND</span><strong>VS</strong><small>01</small></div>
-            <FighterPanel fighter={cpu} outfit={outfit} side="cpu" />
           </div>
 
           <div className="roster-wrap">
-            <div className="roster-label"><span>ROSTER // 16 DISTINCT ROLES // SELECT P1</span><button onClick={() => randomRival(playerId)}>RANDOMIZE RIVAL ↻</button></div>
+            <div className="roster-label"><span>ROSTER // 16 DISTINCT FIGHTERS // ONE ACTIVE SELECTION</span><small>RIVAL LOCKS WHEN THE MATCH STARTS</small></div>
             <div className="roster-grid">
-              {FIGHTERS.map((fighter) => <FighterCard key={fighter.id} fighter={fighter} selected={fighter.id === playerId} rival={fighter.id === cpuId} onClick={() => { setPlayerId(fighter.id); if (fighter.id === cpuId) randomRival(fighter.id); }} />)}
+              {FIGHTERS.map((fighter) => <FighterCard key={fighter.id} fighter={fighter} selected={fighter.id === playerId} onClick={() => { setPlayerId(fighter.id); if (fighter.id === cpuId) randomRival(fighter.id); }} />)}
             </div>
           </div>
 
@@ -320,9 +334,26 @@ export function NeonClash() {
 }
 
 function RoomLobby({ room, code, setCode, busy, error, openRooms, createRoom, joinRoom, startFight, close }: { room: RoomSession | null; code: string; setCode: (value: string) => void; busy: boolean; error: string; openRooms: OpenRoom[]; createRoom: () => void; joinRoom: (watchOnly?: boolean, code?: string) => void; startFight: () => void; close: () => void }) {
-  const share = () => { const url = `${window.location.origin}${window.location.pathname}?room=${room?.id ?? code}`; void navigator.clipboard.writeText(url); };
-  const email = () => { const url = `${window.location.origin}${window.location.pathname}?room=${room?.id ?? code}`; window.location.href = `mailto:?subject=${encodeURIComponent("Join my Neon Clash room")}&body=${encodeURIComponent(`Room ${room?.id ?? code}: ${url}`)}`; };
-  return <div className="online-backdrop"><section className="online-lobby"><button className="close-lobby" onClick={close}>×</button><p className="eyebrow">CROSS-COMPUTER MATCHMAKING // LIVE SPECTATORS</p><h2>{room ? `ROOM ${room.id}` : "ENTER THE LOBBY"}</h2><p className="lobby-copy">Create a room, copy its link, and open it on a second computer. The host runs the match while both players send live keyboard input.</p>{room ? <div className="room-console"><div className="slot-row"><span className={room.hostOnline === false ? "waiting" : "filled"}>P1<br /><b>{room.hostOnline === false ? "OFFLINE" : "HOST"}</b></span><i>VS</i><span className={room.players === 2 ? "filled" : "waiting"}>P2<br /><b>{room.players === 2 ? "CONNECTED" : "WAITING"}</b></span></div><div className="room-metrics"><span>{room.players}/2 PLAYERS</span><span>{room.spectators} WATCHING</span><span>{room.status.toUpperCase()}</span></div><div className="room-actions"><button onClick={share}>COPY INVITE LINK</button><button onClick={email}>EMAIL INVITE</button>{room.role === "host" && <button className="primary" disabled={room.players < 2} onClick={startFight}>{room.players < 2 ? "WAITING FOR P2" : "START MATCH"}</button>}{room.role !== "host" && <button className="primary" disabled>{room.role === "spectator" ? "WATCHING ROOM" : room.hostOnline === false ? "HOST DISCONNECTED" : "WAITING FOR HOST"}</button>}</div></div> : <div className="lobby-grid"><div><b>HOST ON THIS COMPUTER</b><span>Create a six-character room and share the link with Player 2.</span><button className="primary" disabled={busy} onClick={createRoom}>CREATE TWO-PLAYER ROOM</button></div><div><b>JOIN FROM ANOTHER COMPUTER</b><input value={code} onChange={(event) => setCode(event.target.value.toUpperCase().slice(0, 6))} aria-label="Room code" placeholder="6-DIGIT ROOM CODE" /><button disabled={busy || code.length !== 6} onClick={() => joinRoom(false)}>JOIN AS PLAYER 2</button><button disabled={busy || code.length !== 6} onClick={() => joinRoom(true)}>WATCH ONLY</button></div></div>}{error && <strong className="connection-state failed">{error}</strong>}{!room && openRooms.length > 0 && <div className="open-room-list"><b>OPEN ROOMS</b>{openRooms.map((item) => <div key={item.id}><span><strong>{item.id}</strong><small>{item.players}/2 · {item.status.toUpperCase()}</small></span><button onClick={() => joinRoom(false, item.id)}>{item.players < 2 ? "JOIN" : "WATCH"}</button></div>)}</div>}</section></div>;
+  const [copied, setCopied] = useState("");
+  const [inviteUrl, setInviteUrl] = useState("");
+  const [networkReady, setNetworkReady] = useState(false);
+  useEffect(() => {
+    setInviteUrl(`${window.location.origin}${window.location.pathname}?room=${room?.id ?? code}`);
+    setNetworkReady(!["localhost", "127.0.0.1"].includes(window.location.hostname));
+  }, [code, room?.id]);
+  const copyText = async (value: string, label: string) => {
+    try {
+      if (window.isSecureContext && navigator.clipboard) await navigator.clipboard.writeText(value);
+      else {
+        const field = document.createElement("textarea");
+        field.value = value; field.style.position = "fixed"; field.style.opacity = "0";
+        document.body.appendChild(field); field.select(); document.execCommand("copy"); field.remove();
+      }
+      setCopied(label); window.setTimeout(() => setCopied(""), 1600);
+    } catch { setCopied("COPY FAILED — SELECT LINK ABOVE"); }
+  };
+  const email = () => { window.location.href = `mailto:?subject=${encodeURIComponent("Join my Neon Clash room")}&body=${encodeURIComponent(`Room ${room?.id ?? code}: ${inviteUrl}`)}`; };
+  return <div className="online-backdrop"><section className="online-lobby"><button className="close-lobby" onClick={close}>×</button><p className="eyebrow">CROSS-COMPUTER MATCHMAKING // LIVE SPECTATORS</p><h2>{room ? `ROOM ${room.id}` : "ENTER THE LOBBY"}</h2><p className="lobby-copy">Create a room and open its Player 2 link on the other computer. Invite links now join automatically.</p>{room ? <div className="room-console"><div className="slot-row"><span className={room.hostOnline === false ? "waiting" : "filled"}>P1<br /><b>{room.hostOnline === false ? "OFFLINE" : "HOST"}</b></span><i>VS</i><span className={room.players === 2 ? "filled" : "waiting"}>P2<br /><b>{room.players === 2 ? "CONNECTED" : "WAITING"}</b></span></div><div className="room-metrics"><span>{room.players}/2 PLAYERS</span><span>{room.spectators} WATCHING</span><span>{room.status.toUpperCase()}</span></div><div className="invite-strip"><label>PLAYER 2 AUTO-JOIN LINK</label><input value={inviteUrl} readOnly aria-label="Player 2 invite link" /><small>{networkReady ? "Ready for another computer on this network." : "For another computer, open Neon Clash using this computer's network address before copying."}</small></div><div className="room-actions"><button onClick={() => void copyText(inviteUrl, "LINK COPIED")}>{copied || "COPY PLAYER 2 LINK"}</button><a href={inviteUrl} target="_blank" rel="noreferrer">OPEN PLAYER 2 LINK</a><button onClick={() => void copyText(room.id, "ROOM CODE COPIED")}>COPY ROOM CODE</button><button onClick={email}>EMAIL INVITE</button>{room.role === "host" && <button className="primary" disabled={room.players < 2} onClick={startFight}>{room.players < 2 ? "WAITING FOR P2" : "START MATCH"}</button>}{room.role !== "host" && <button className="primary" disabled>{room.role === "spectator" ? "WATCHING ROOM" : room.hostOnline === false ? "HOST DISCONNECTED" : "WAITING FOR HOST"}</button>}</div></div> : <div className="lobby-grid"><div><b>HOST ON THIS COMPUTER</b><span>Create a six-character room and share the auto-join link with Player 2.</span><button className="primary" disabled={busy} onClick={createRoom}>CREATE TWO-PLAYER ROOM</button></div><div><b>JOIN FROM ANOTHER COMPUTER</b><input value={code} onChange={(event) => setCode(event.target.value.toUpperCase().slice(0, 6))} aria-label="Room code" placeholder="6-DIGIT ROOM CODE" /><button disabled={busy || code.length !== 6} onClick={() => joinRoom(false)}>JOIN AS PLAYER 2</button><button disabled={busy || code.length !== 6} onClick={() => joinRoom(true)}>WATCH ONLY</button></div></div>}{error && <strong className="connection-state failed">{error}</strong>}{!room && openRooms.length > 0 && <div className="open-room-list"><b>OPEN ROOMS</b>{openRooms.map((item) => <div key={item.id}><span><strong>{item.id}</strong><small>{item.players}/2 · {item.status.toUpperCase()}</small></span><button onClick={() => joinRoom(item.players >= 2, item.id)}>{item.players < 2 ? "JOIN" : "WATCH"}</button></div>)}</div>}</section></div>;
 }
 
 function FighterPanel({ fighter, outfit, side }: { fighter: Fighter; outfit: Outfit; side: "player" | "cpu" }) {
@@ -359,7 +390,7 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
     const W = 1280, H = 720, FLOOR = 584;
     const lowPower = (navigator as Navigator & { deviceMemory?: number }).deviceMemory !== undefined && ((navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8) <= 4;
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const dpr = Math.min(window.devicePixelRatio || 1, lowPower ? 1.25 : 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, lowPower ? 1 : 1.25);
     canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = true;
@@ -369,13 +400,21 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
     const bg = background.getContext("2d")!;
     drawBackground(bg, W, H, stage);
 
-    const spriteCache = new Map<string, HTMLCanvasElement>();
-    const spritePoses: SpritePose[] = ["idle", "punch", "kick", "special", "guard", "hurt"];
-    for (const f of [player, cpu]) for (const pose of spritePoses) spriteCache.set(`${f.id}:${pose}`, buildSprite(f, outfit, pose));
-    const artSheets: Record<"main" | "bonus", HTMLImageElement> = { main: new Image(), bonus: new Image() };
-    artSheets.main.src = "/characters/neon-clash-roster-concept.webp";
-    artSheets.bonus.src = "/characters/neon-clash-bonus-roster-concept.webp";
-
+    const spriteSheets: Partial<Record<string, HTMLImageElement>> = {};
+    for (const [id, src] of Object.entries({ kael: "/characters/kael-combat-sprites-v2.png", zara: "/characters/zara-combat-sprites-v2.png" })) {
+      const image = new Image(); image.decoding = "async"; image.src = src; spriteSheets[id] = image;
+    }
+    const illustratedSprites = new Map<string, Record<SpritePose, HTMLCanvasElement>>();
+    for (const fighter of [player, cpu]) {
+      illustratedSprites.set(fighter.id, {
+        idle: buildSprite(fighter, outfit, "idle"),
+        punch: buildSprite(fighter, outfit, "punch"),
+        kick: buildSprite(fighter, outfit, "kick"),
+        special: buildSprite(fighter, outfit, "special"),
+        guard: buildSprite(fighter, outfit, "guard"),
+        hurt: buildSprite(fighter, outfit, "hurt"),
+      });
+    }
     const p1 = createCombatant(player, 350, 1);
     const p2 = createCombatant(cpu, 930, -1);
     const projectiles: Projectile[] = [];
@@ -399,6 +438,9 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
     const directionHistory: Array<{ key: string; at: number }> = [];
     const previousWants = new Map<Combatant, Record<string, boolean>>([[p1, {}], [p2, {}]]);
     let lastRemoteActionSeq = -1;
+    let snapshotSequence = 0;
+    let lastAppliedRemoteSequence = -1;
+    let remoteSnapshotReceivedAt = performance.now();
     let comboBonus = 0;
     let comboCallout = 0;
     let finisherTime = 0;
@@ -412,7 +454,9 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       const tail = inputHistory.slice(-sequence.length);
       if (tail.length === sequence.length && tail.every((item, index) => item.key === sequence[index]) && tail[tail.length - 1].at - tail[0].at <= 1100) {
         comboBonus = 12; comboCallout = 1.25; p1.drive = clamp(p1.drive + 18, 0, 100); inputHistory.length = 0;
+        return true;
       }
+      return false;
     };
 
     const applyCombatantSnapshot = (target: Combatant, value: CombatantSnapshot) => {
@@ -425,14 +469,24 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
 
     const applyRemoteSnapshot = () => {
       const snapshot = remoteStateRef.current; if (!snapshot) return;
+      const nextSequence = Number(snapshot.sequence ?? 0);
+      if (nextSequence !== lastAppliedRemoteSequence) { lastAppliedRemoteSequence = nextSequence; remoteSnapshotReceivedAt = performance.now(); }
+      const prediction = Math.min(0.1, Math.max(0, (performance.now() - remoteSnapshotReceivedAt) / 1000));
       applyCombatantSnapshot(p1, snapshot.p1); applyCombatantSnapshot(p2, snapshot.p2); timer = snapshot.timer; round = snapshot.round; roundState = snapshot.roundState;
+      for (const combatant of [p1, p2]) {
+        combatant.x = clamp(combatant.x + combatant.vx * prediction, 92, W - 92);
+        combatant.y += combatant.vy * prediction;
+        combatant.attackTime += prediction;
+        combatant.hurtTime = Math.max(0, combatant.hurtTime - prediction);
+        combatant.stunTime = Math.max(0, combatant.stunTime - prediction);
+      }
       projectiles.length = 0;
-      for (const item of snapshot.projectiles ?? []) projectiles.push({ ...item, owner: item.owner === 1 ? p1 : p2 });
+      for (const item of snapshot.projectiles ?? []) projectiles.push({ ...item, x: item.x + item.vx * prediction, life: Math.max(0, item.life - prediction), owner: item.owner === 1 ? p1 : p2 });
     };
 
     const combatantSnapshot = (value: Combatant): CombatantSnapshot => ({ x: value.x, y: value.y, vx: value.vx, vy: value.vy, facing: value.facing, health: value.health, drive: value.drive, grounded: value.grounded, crouching: value.crouching, guarding: value.guarding, attack: value.attack, attackTime: value.attackTime, attackHit: value.attackHit, hurtTime: value.hurtTime, stunTime: value.stunTime, flashTime: value.flashTime, combo: value.combo, comboWindow: value.comboWindow, guardMeter: value.guardMeter, evadeTime: value.evadeTime, wins: value.wins });
 
-    const snapshot = (): MatchSnapshot => ({ p1: combatantSnapshot(p1), p2: combatantSnapshot(p2), timer, round, roundState, projectiles: projectiles.map((item) => ({ x: item.x, y: item.y, vx: item.vx, life: item.life, color: item.color, damage: item.damage, owner: item.owner === p1 ? 1 : 2 })) });
+    const snapshot = (): MatchSnapshot => ({ sequence: ++snapshotSequence, p1: combatantSnapshot(p1), p2: combatantSnapshot(p2), timer, round, roundState, projectiles: projectiles.map((item) => ({ x: item.x, y: item.y, vx: item.vx, life: item.life, color: item.color, damage: item.damage, owner: item.owner === p1 ? 1 : 2 })) });
 
     const burst = (x: number, y: number, color: string, count: number) => {
       const room = particleCap - particles.length;
@@ -444,17 +498,19 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
     };
 
     const startAttack = (c: Combatant, type: Combatant["attack"], cancel = false) => {
-      if (!type || (!cancel && c.attack) || c.hurtTime > 0 || c.stunTime > 0 || c.evadeTime > 0 || roundState !== "fight") return;
+      if (!type || (!cancel && c.attack) || c.hurtTime > 0 || c.stunTime > 0 || c.evadeTime > 0 || roundState !== "fight") return false;
       const costs = { lightPunch: 0, heavyPunch: 0, lightKick: 0, heavyKick: 0, special: 25, impact: 32, super: 65 };
-      if (c.drive < costs[type]) return;
+      if (c.drive < costs[type]) return false;
       c.drive -= costs[type]; c.attack = type; c.attackTime = 0; c.attackHit = false; c.guarding = false;
       if (type === "special" || type === "super") {
         burst(c.x + c.facing * 58, c.y - 126, c.fighter.color, type === "super" ? 46 : c === p1 && comboBonus > 0 ? 34 : 14);
         if (type === "super" || (c === p1 && comboBonus > 0)) { finisherTime = type === "super" ? 1.55 : 1.15; finisherName = c.fighter.ultimate; finisherColor = c.fighter.color; shake = type === "super" ? 23 : 16; }
       }
-      if ((type === "special" || type === "super") && (c.fighter.style === "Zoner" || c.fighter.style === "Control")) {
-        projectiles.push({ x: c.x + c.facing * 70, y: c.y - 116, vx: c.facing * (type === "super" ? 720 : 520 + c.fighter.reach * 10), life: type === "super" ? 2.2 : 1.8, owner: c, color: c.fighter.color, damage: (type === "super" ? 27 : 13) + c.fighter.power * 0.45 + (c === p1 ? comboBonus : 0) });
+      if (type === "special" || type === "super") {
+        const rangedStyle = c.fighter.style === "Zoner" || c.fighter.style === "Control" || c.fighter.style === "Gadget";
+        projectiles.push({ x: c.x + c.facing * 76, y: c.y - 122, vx: c.facing * (type === "super" ? 760 : (rangedStyle ? 610 : 525) + c.fighter.reach * 10), life: type === "super" ? 2.35 : 1.95, owner: c, color: c.fighter.color, damage: (type === "super" ? 27 : rangedStyle ? 14 : 11) + c.fighter.power * 0.45 + (c === p1 ? comboBonus : 0) });
       }
+      return true;
     };
 
     const hit = (attacker: Combatant, defender: Combatant, damage: number, force: number, color: string, impact = false) => {
@@ -492,6 +548,9 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       const previous = previousWants.get(c) ?? {};
       const pressed = Object.fromEntries(Object.keys(wants).map((key) => [key, !!wants[key] && !previous[key]])) as Record<string, boolean>;
       const requestedAttack = (): Combatant["attack"] => pressed.super ? "super" : pressed.impact ? "impact" : pressed.special ? "special" : pressed.heavyKick ? "heavyKick" : pressed.heavyPunch ? "heavyPunch" : pressed.lightKick ? "lightKick" : pressed.lightPunch ? "lightPunch" : null;
+      const freshAttack = requestedAttack();
+      if (freshAttack) { c.queuedAttack = freshAttack; c.queuedTime = 0.24; }
+      else { c.queuedTime = Math.max(0, c.queuedTime - dt); if (c.queuedTime === 0) c.queuedAttack = null; }
       c.facing = c.x < foe.x ? 1 : -1;
       c.hurtTime = Math.max(0, c.hurtTime - dt); c.stunTime = Math.max(0, c.stunTime - dt); c.flashTime = Math.max(0, c.flashTime - dt);
       c.evadeTime = Math.max(0, c.evadeTime - dt); c.guardMeter = clamp(c.guardMeter + dt * (c.guarding ? 1.2 : 8), 0, 100);
@@ -504,20 +563,20 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
         const speed = (190 + c.fighter.speed * 16) * (c.crouching || c.guarding ? 0.22 : 1);
         c.vx = lerp(c.vx, move * speed, 0.26);
         if (pressed.jump && c.grounded && !c.crouching && !c.guarding) { c.vy = -(550 + c.fighter.speed * 7); c.grounded = false; }
-        startAttack(c, requestedAttack());
+        if (c.queuedAttack && startAttack(c, c.queuedAttack)) { c.queuedAttack = null; c.queuedTime = 0; }
       } else if (c.hurtTime > 0 || c.stunTime > 0) c.guarding = false;
 
       if (c.attack) {
         c.attackTime += dt;
         const data = attackData(c.attack);
-        const isProjectileSpecial = (c.attack === "special" || c.attack === "super") && (c.fighter.style === "Zoner" || c.fighter.style === "Control");
+        const isProjectileSpecial = c.attack === "special" || c.attack === "super";
         if (!c.attackHit && !isProjectileSpecial && c.attackTime >= data.activeA && c.attackTime <= data.activeB && Math.abs(c.x - foe.x) < data.range + c.fighter.reach * 2 && Math.abs(c.y - foe.y) < 105) {
           c.attackHit = true; hit(c, foe, data.damage + c.fighter.power * 0.42 + (c === p1 && c.attack === "special" ? comboBonus : 0), data.force, c.fighter.color, c.attack === "impact" || c.attack === "super");
         }
         if ((c.attack === "special" || c.attack === "super") && !isProjectileSpecial && c.attackTime < 0.42) c.vx += c.facing * (c.attack === "super" ? 52 : 28);
-        const next = requestedAttack();
+        const next = c.queuedAttack;
         const rank = { lightPunch: 1, lightKick: 1, heavyPunch: 2, heavyKick: 2, impact: 3, special: 4, super: 5 };
-        if (next && c.attackHit && c.comboWindow > 0 && rank[next] > rank[c.attack]) startAttack(c, next, true);
+        if (next && c.attackHit && c.comboWindow > 0 && rank[next] > rank[c.attack] && startAttack(c, next, true)) { c.queuedAttack = null; c.queuedTime = 0; }
         else if (c.attackTime >= data.end) { if (c === p1 && (c.attack === "special" || c.attack === "super")) comboBonus = 0; c.attack = null; c.attackTime = 0; }
       }
 
@@ -542,8 +601,8 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
     };
 
     const resetRound = () => {
-      p1.x = 350; p1.y = FLOOR; p1.vx = p1.vy = 0; p1.health = 100; p1.drive = 65; p1.guardMeter = 100; p1.evadeTime = 0; p1.attack = null; p1.hurtTime = p1.stunTime = 0;
-      p2.x = 930; p2.y = FLOOR; p2.vx = p2.vy = 0; p2.health = 100; p2.drive = 65; p2.guardMeter = 100; p2.evadeTime = 0; p2.attack = null; p2.hurtTime = p2.stunTime = 0;
+      p1.x = 350; p1.y = FLOOR; p1.vx = p1.vy = 0; p1.health = 100; p1.drive = 65; p1.guardMeter = 100; p1.evadeTime = 0; p1.attack = null; p1.queuedAttack = null; p1.queuedTime = 0; p1.hurtTime = p1.stunTime = 0;
+      p2.x = 930; p2.y = FLOOR; p2.vx = p2.vy = 0; p2.health = 100; p2.drive = 65; p2.guardMeter = 100; p2.evadeTime = 0; p2.attack = null; p2.queuedAttack = null; p2.queuedTime = 0; p2.hurtTime = p2.stunTime = 0;
       projectiles.length = 0; particles.length = 0; timer = 75; roundState = "intro"; stateTimer = 1.15;
     };
 
@@ -596,37 +655,43 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
     };
 
     const drawCombatant = (c: Combatant) => {
-      const pose: SpritePose = c.hurtTime > 0 ? "hurt" : c.guarding || c.evadeTime > 0 ? "guard" : c.attack === "lightPunch" || c.attack === "heavyPunch" || c.attack === "impact" ? "punch" : c.attack === "lightKick" || c.attack === "heavyKick" ? "kick" : c.attack === "special" || c.attack === "super" ? "special" : "idle";
-      const sprite = spriteCache.get(`${c.fighter.id}:${pose}`)!;
       const attack = c.attack ? attackData(c.attack) : null;
       const reach = c.attack && attack && c.attackTime > attack.activeA * 0.75 && c.attackTime < attack.activeB ? (c.attack === "lightPunch" ? 18 : c.attack === "lightKick" ? 26 : c.attack === "impact" ? 44 : 34) : 0;
-      const bob = c.grounded ? Math.sin(performance.now() * 0.004) * 2 : 0;
+      const now = performance.now();
+      const bob = c.grounded ? Math.sin(now * 0.004) * 2 : 0;
       ctx.save(); ctx.translate(c.x + c.facing * reach, c.y + bob); ctx.scale(c.facing, 1);
+      ctx.fillStyle = "rgba(0,0,0,.42)"; ctx.beginPath(); ctx.ellipse(0, 2, c.fighter.kind === "monster" ? 78 : 58, 11, 0, 0, Math.PI * 2); ctx.fill();
       if (c.guarding) { ctx.globalAlpha = 0.42; ctx.strokeStyle = c.fighter.color; ctx.lineWidth = 10; ctx.beginPath(); ctx.arc(6, -125, 88, -1.25, 1.25); ctx.stroke(); ctx.globalAlpha = 1; }
       if (c.evadeTime > 0) ctx.globalAlpha = 0.42;
       if (c.flashTime > 0) ctx.globalCompositeOperation = "screen";
-      const sheet = artSheets[c.fighter.portrait.sheet];
-      if (sheet.complete && sheet.naturalWidth > 0) {
-        const total = c.fighter.portrait.sheet === "main" ? 10 : 6;
-        const slotWidth = sheet.naturalWidth / total;
-        const sourceWidth = slotWidth * 0.88;
-        const sourceX = slotWidth * c.fighter.portrait.index + (slotWidth - sourceWidth) / 2;
-        const height = c.crouching ? 286 : c.fighter.kind === "monster" ? 390 : c.fighter.kind === "youth" ? 318 : 360;
-        const width = c.fighter.kind === "monster" ? 190 : c.fighter.kind === "robot" ? 126 : c.fighter.kind === "youth" ? 118 : c.fighter.kind === "elder" ? 144 : ["Grappler", "Armor"].includes(c.fighter.style) ? 158 : 138;
-        const attackLean = pose === "punch" ? -0.055 : pose === "kick" ? 0.075 : pose === "hurt" ? -0.11 : 0;
-        const attackShift = pose === "punch" ? 26 : pose === "kick" ? 18 : pose === "special" ? 14 : 0;
-        ctx.save();
-        ctx.translate(attackShift, 0); ctx.rotate(attackLean);
-        if (pose === "special") { ctx.translate(0, -8); ctx.scale(1.08, 1.08); }
-        ctx.globalCompositeOperation = "screen";
-        ctx.filter = `contrast(1.14) saturate(1.18) drop-shadow(0 8px 5px #03050c) drop-shadow(0 0 12px ${c.fighter.color})`;
-        if (c.attack === "super") { ctx.globalAlpha = 0.34; ctx.strokeStyle = c.fighter.color; ctx.lineWidth = 12; ctx.beginPath(); ctx.ellipse(0, -height * 0.52, width * 0.72, height * 0.52, 0, 0, Math.PI * 2); ctx.stroke(); }
-        ctx.globalAlpha = c.evadeTime > 0 ? 0.52 : 1;
-        ctx.drawImage(sheet, sourceX, 0, sourceWidth, sheet.naturalHeight, -width / 2, -height, width, height);
+      const attackProgress = c.attack && attack ? clamp(c.attackTime / attack.end, 0, 1) : 0;
+      const sprite = spriteSheets[c.fighter.id];
+      if (sprite?.complete && sprite.naturalWidth > 0) {
+        const moving = c.grounded && Math.abs(c.vx) > 30 && !c.attack && !c.guarding && c.hurtTime <= 0;
+        const frame = c.hurtTime > 0 ? 7 : c.guarding || c.evadeTime > 0 ? 6 : !c.grounded ? 3 : c.attack === "lightKick" || c.attack === "heavyKick" ? 5 : c.attack ? 4 : moving ? (Math.floor(now / 130) % 2 ? 1 : 2) : 0;
+        const cellW = sprite.naturalWidth / 4, cellH = sprite.naturalHeight / 2;
+        const sx = (frame % 4) * cellW, sy = Math.floor(frame / 4) * cellH;
+        const destH = c.fighter.id === "zara" ? 382 : 365;
+        const destW = destH * cellW / cellH;
+        const lean = c.hurtTime > 0 ? -0.08 : c.attack ? (frame === 5 ? -0.025 : 0.035) * Math.sin(Math.PI * attackProgress) : 0;
+        ctx.save(); ctx.rotate(lean);
+        if (c.crouching) { ctx.translate(0, 42); ctx.scale(1, .86); }
+        if (c.attack === "special" || c.attack === "super") {
+          ctx.globalAlpha = .34; ctx.strokeStyle = c.fighter.color; ctx.lineWidth = c.attack === "super" ? 13 : 8; ctx.beginPath(); ctx.ellipse(0, -destH * .48, destW * .3, destH * .48, 0, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1;
+        }
+        ctx.drawImage(sprite, sx, sy, cellW, cellH, -destW / 2, -destH, destW, destH);
         ctx.restore();
       } else {
-        if (c.attack === "super") { for (let trail = 3; trail > 0; trail--) { ctx.globalAlpha = 0.1 * trail; ctx.drawImage(sprite, -112 - trail * 24, -300, 224, 300); } ctx.globalAlpha = 1; }
-        ctx.drawImage(sprite, -112, c.crouching ? -250 : -300, 224, c.crouching ? 250 : 300);
+        const pose: SpritePose = c.hurtTime > 0 ? "hurt" : c.guarding || c.evadeTime > 0 ? "guard" : c.attack === "lightKick" || c.attack === "heavyKick" ? "kick" : c.attack === "special" || c.attack === "super" ? "special" : c.attack ? "punch" : "idle";
+        const fallback = illustratedSprites.get(c.fighter.id)?.[pose];
+        if (fallback) {
+          const destH = c.fighter.kind === "monster" ? 390 : c.fighter.kind === "youth" ? 326 : 365;
+          const destW = destH * fallback.width / fallback.height;
+          ctx.save();
+          if (c.crouching) { ctx.translate(0, 42); ctx.scale(1, .86); }
+          ctx.drawImage(fallback, -destW / 2, -destH, destW, destH);
+          ctx.restore();
+        }
       }
       ctx.restore();
       if (c.combo > 1) { ctx.fillStyle = c.fighter.color; ctx.font = "900 22px Arial"; ctx.textAlign = "center"; ctx.fillText(`${c.combo} HIT`, c.x, c.y - 330); }
@@ -650,13 +715,25 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       ctx.save();
       const sx = shake > 0.5 ? (Math.random() - 0.5) * shake : 0, sy = shake > 0.5 ? (Math.random() - 0.5) * shake * 0.5 : 0;
       ctx.translate(sx, sy); ctx.drawImage(background, 0, 0);
-      for (const q of projectiles) { ctx.globalAlpha = 0.28; ctx.fillStyle = q.color; ctx.beginPath(); ctx.arc(q.x, q.y, 34, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; ctx.fillStyle = "#f5ffff"; ctx.beginPath(); ctx.arc(q.x, q.y, 15, 0, Math.PI * 2); ctx.fill(); }
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      for (const q of projectiles) {
+        const direction = Math.sign(q.vx) || 1, pulse = 1 + Math.sin(performance.now() * .028 + q.x * .02) * .16;
+        const trail = ctx.createLinearGradient(q.x - direction * 125, q.y, q.x + direction * 22, q.y);
+        trail.addColorStop(0, "transparent"); trail.addColorStop(.54, `${q.color}55`); trail.addColorStop(1, q.color);
+        ctx.fillStyle = trail; ctx.beginPath(); ctx.moveTo(q.x - direction * 128, q.y); ctx.lineTo(q.x - direction * 20, q.y - 25 * pulse); ctx.lineTo(q.x + direction * 23, q.y); ctx.lineTo(q.x - direction * 20, q.y + 25 * pulse); ctx.closePath(); ctx.fill();
+        ctx.shadowBlur = 28; ctx.shadowColor = q.color; ctx.strokeStyle = q.color; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(q.x, q.y, 25 * pulse, 0, Math.PI * 2); ctx.stroke();
+        ctx.shadowBlur = 16; ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(q.x, q.y, 10 * pulse, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "#eaffff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(q.x - direction * 72, q.y + 5); ctx.lineTo(q.x - direction * 45, q.y - 10); ctx.lineTo(q.x - direction * 18, q.y + 7); ctx.lineTo(q.x + direction * 13, q.y - 3); ctx.stroke();
+      }
+      ctx.restore();
       drawCombatant(p1); drawCombatant(p2);
-      for (const q of particles) { ctx.globalAlpha = clamp(q.life / q.maxLife, 0, 1); ctx.fillStyle = q.color; ctx.fillRect(q.x, q.y, q.size * 2.4, q.size); } ctx.globalAlpha = 1;
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      for (const q of particles) { const alpha = clamp(q.life / q.maxLife, 0, 1); ctx.globalAlpha = alpha; ctx.shadowBlur = 12; ctx.shadowColor = q.color; ctx.strokeStyle = q.color; ctx.lineWidth = Math.max(1.5, q.size * .55); ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x - q.vx * .035, q.y - q.vy * .035); ctx.stroke(); }
+      ctx.restore(); ctx.globalAlpha = 1; ctx.shadowBlur = 0;
       drawHud();
       if (roundState === "intro") drawCenterText(`ROUND ${round}`, "FIGHT");
       if (roundState === "ko") drawCenterText("K.O.", p1.health > p2.health ? p1.fighter.name : p2.fighter.name);
-      if (comboCallout > 0) { ctx.textAlign = "center"; ctx.fillStyle = p1.fighter.color; ctx.font = "italic 900 32px Arial"; ctx.fillText(player.combo.name, W / 2, 175); ctx.font = "800 13px Arial"; ctx.fillStyle = "#eefcff"; ctx.fillText("FINISHER ARMED — PRESS L", W / 2, 198); }
+      if (comboCallout > 0) { ctx.textAlign = "center"; ctx.shadowBlur = 24; ctx.shadowColor = p1.fighter.color; ctx.fillStyle = p1.fighter.color; ctx.font = "italic 900 34px Arial"; ctx.fillText(player.combo.name, W / 2, 175); ctx.shadowBlur = 0; ctx.font = "800 13px Arial"; ctx.fillStyle = "#eefcff"; ctx.fillText("PERFECT CHAIN — FINISHER DEPLOYED", W / 2, 200); }
       if (finisherTime > 0) {
         const pulse = .68 + Math.sin(performance.now() * .035) * .12;
         ctx.globalAlpha = pulse; ctx.fillStyle = "#02030a"; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
@@ -681,8 +758,8 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
     };
 
     const keyMap: Record<string, string> = { KeyA: "left", KeyD: "right", KeyW: "jump", KeyS: "crouch", KeyE: "evade", Space: "guard" };
-    const attackKeyMap: Record<string, NonNullable<Combatant["attack"]>> = { KeyU: "lightPunch", KeyI: "heavyPunch", KeyJ: "lightKick", KeyK: "heavyKick", KeyL: "special", KeyO: "impact", KeyP: "super" };
-    const comboKeys: Record<string, string> = { lightPunch: "T", heavyPunch: "Y", lightKick: "U", heavyKick: "K", special: "L", impact: "Y", super: "L" };
+    const attackKeyMap: Record<string, NonNullable<Combatant["attack"]>> = { KeyY: "lightPunch", KeyU: "heavyPunch", KeyI: "lightKick", KeyL: "heavyKick", KeyO: "special", KeyP: "super" };
+    const comboKeyMap: Record<string, string> = { KeyY: "Y", KeyU: "U", KeyI: "I", KeyL: "L" };
     const direction = () => inputs.crouch ? inputs.left ? "DFL" : inputs.right ? "DFR" : "D" : inputs.left ? "L" : inputs.right ? "R" : "N";
     const recordDirection = () => {
       const now = performance.now(), key = direction();
@@ -703,11 +780,12 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       if ((base === "heavyPunch" && !!inputs.heavyKick) || (base === "heavyKick" && !!inputs.heavyPunch)) return "impact" as const;
       return base;
     };
-    const pulseAction = (action: NonNullable<Combatant["attack"]>) => {
+    const pulseAction = (initialAction: NonNullable<Combatant["attack"]>, comboKey?: string) => {
+      const comboFinished = comboKey ? recordAction(comboKey) : false;
+      const action = comboFinished ? "special" : initialAction;
       inputs[action] = true;
       inputs.actionSeq = Number(inputs.actionSeq ?? 0) + 1;
       inputs.action = action;
-      if (comboKeys[action]) recordAction(comboKeys[action]);
       sendInput({ ...inputs });
       window.setTimeout(() => { inputs[action] = false; sendInput({ ...inputs }); }, 72);
     };
@@ -721,7 +799,7 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
         inputs[control] = down;
         if (["left", "right", "crouch"].includes(control)) recordDirection();
         sendInput({ ...inputs });
-      } else if (down && !event.repeat && attack) pulseAction(resolveCommand(attack));
+      } else if (down && !event.repeat && attack) pulseAction(resolveCommand(attack), comboKeyMap[event.code]);
     };
     const keyDown = (e: KeyboardEvent) => onKey(e, true), keyUp = (e: KeyboardEvent) => onKey(e, false);
     window.addEventListener("keydown", keyDown, { passive: false }); window.addEventListener("keyup", keyUp, { passive: false });
@@ -738,7 +816,7 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       inputRef.current.action = control;
     }
     sendInput({ ...inputRef.current });
-  };
+  }
 
   return (
     <div className="arena-wrap">
@@ -788,6 +866,146 @@ function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, sta
   for (let y = 430; y < h; y += 42) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
   ctx.globalAlpha = 1; ctx.fillStyle = `${stage.accent}22`; ctx.fillRect(0, 579, w, 9);
   ctx.globalAlpha = 0.05; ctx.fillStyle = "#fff"; for (let y = 0; y < h; y += 4) ctx.fillRect(0, y, w, 1); ctx.globalAlpha = 1;
+}
+
+type RigPoint = { x: number; y: number };
+
+function drawArticulatedFighter(ctx: CanvasRenderingContext2D, c: Combatant, outfit: Outfit, now: number, attackProgress: number) {
+  const f = c.fighter;
+  const youth = f.kind === "youth";
+  const robot = f.kind === "robot";
+  const monster = f.kind === "monster";
+  const elder = f.kind === "elder";
+  const heavy = monster || ["Grappler", "Armor", "Juggernaut"].includes(f.style);
+  const scale = monster ? 1.28 : youth ? 0.92 : elder ? 1.02 : heavy ? 1.16 : 1.09;
+  const moving = c.grounded && Math.abs(c.vx) > 28 && !c.attack && !c.guarding && c.hurtTime <= 0;
+  const stride = moving ? Math.sin(now * 0.018 + c.x * 0.012) : 0;
+  const breath = Math.sin(now * 0.0038 + c.x) * 2.5;
+  const strike = Math.sin(Math.PI * attackProgress);
+  const recover = Math.sin(Math.PI * clamp(attackProgress * 1.35, 0, 1));
+  const isPunch = c.attack === "lightPunch" || c.attack === "heavyPunch" || c.attack === "impact";
+  const isKick = c.attack === "lightKick" || c.attack === "heavyKick";
+  const isSpecial = c.attack === "special" || c.attack === "super";
+  const crouch = c.crouching ? 62 : 0;
+  const hurt = c.hurtTime > 0 ? clamp(c.hurtTime * 4, 0, 1) : 0;
+  const lean = isPunch ? 16 * strike : isKick ? -8 * strike : isSpecial ? 5 * strike : -24 * hurt;
+
+  ctx.save();
+  ctx.scale(scale, scale);
+  ctx.translate(0, crouch / scale);
+  ctx.filter = `drop-shadow(0 9px 5px rgba(0,0,0,.72)) drop-shadow(0 0 8px ${f.color})`;
+
+  ctx.save();
+  ctx.scale(1 / scale, 1 / scale);
+  ctx.fillStyle = "rgba(0,0,0,.46)";
+  ctx.beginPath(); ctx.ellipse(0, 1, heavy ? 70 : 56, 13, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+
+  const outline = "#050814";
+  const skin: Record<string, string> = { kael: "#d7a079", zara: "#71452f", atlas: "#b77b58", nyx: "#d3a78f", rio: "#a75e3e", sable: "#d3a18b", mara: "#b96d50", batu: "#a86e4e", lux: "#e1b099", oren: "#c89472", miko: "#e7b38d", teo: "#bd7b55", jun: "#d9a481", raku: "#c58c66" };
+  const skinColor = skin[f.id] ?? "#c98d68";
+  const dark = outfit.cut === "sleek" ? "#070b17" : outfit.cut === "heatwave" ? f.secondary : "#111827";
+  const boot = f.id === "atlas" ? "#a66d35" : f.id === "teo" ? "#24d4c3" : "#101522";
+
+  const segment = (a: RigPoint, b: RigPoint, widthA: number, widthB: number, color: string, glow = false) => {
+    const dx = b.x - a.x, dy = b.y - a.y, len = Math.max(1, Math.hypot(dx, dy));
+    const nx = -dy / len, ny = dx / len;
+    ctx.beginPath();
+    ctx.moveTo(a.x + nx * widthA, a.y + ny * widthA);
+    ctx.quadraticCurveTo((a.x + b.x) / 2 + nx * Math.max(widthA, widthB) * .22, (a.y + b.y) / 2 + ny * Math.max(widthA, widthB) * .22, b.x + nx * widthB, b.y + ny * widthB);
+    ctx.arc(b.x, b.y, widthB, Math.atan2(ny, nx), Math.atan2(-ny, -nx));
+    ctx.quadraticCurveTo((a.x + b.x) / 2 - nx * Math.max(widthA, widthB) * .22, (a.y + b.y) / 2 - ny * Math.max(widthA, widthB) * .22, a.x - nx * widthA, a.y - ny * widthA);
+    ctx.arc(a.x, a.y, widthA, Math.atan2(-ny, -nx), Math.atan2(ny, nx));
+    ctx.closePath(); ctx.fillStyle = color; ctx.strokeStyle = outline; ctx.lineWidth = 6; ctx.fill(); ctx.stroke();
+    if (glow) { ctx.strokeStyle = f.color; ctx.lineWidth = 2.5; ctx.globalAlpha = .8; ctx.stroke(); ctx.globalAlpha = 1; }
+  };
+  const joint = (p: RigPoint, radius: number, color: string) => { ctx.fillStyle = color; ctx.strokeStyle = outline; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(p.x, p.y, radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); };
+  const bridge = (p: RigPoint, radius: number, color: string) => { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(p.x, p.y, radius, 0, Math.PI * 2); ctx.fill(); };
+
+  const hipY = -112 + breath - lean * .12;
+  const shoulderY = -218 + breath + lean * .16;
+  const hipFront = { x: 25 + lean * .25, y: hipY };
+  const hipBack = { x: -24 + lean * .25, y: hipY + 3 };
+  let frontKnee = { x: 38 + stride * 27, y: -61 };
+  let frontFoot = { x: 42 + stride * 48, y: -8 };
+  let backKnee = { x: -42 - stride * 25, y: -66 };
+  let backFoot = { x: -45 - stride * 42, y: -7 };
+  if (!c.grounded) { frontKnee = { x: 42, y: -75 }; frontFoot = { x: 68, y: -43 }; backKnee = { x: -30, y: -65 }; backFoot = { x: -54, y: -28 }; }
+  if (isKick) {
+    const high = c.attack === "heavyKick" ? -116 : -82;
+    frontKnee = { x: lerp(42, 94, strike), y: lerp(-63, high - 18, strike) };
+    frontFoot = { x: lerp(45, 174, strike), y: lerp(-7, high, strike) };
+    backKnee = { x: -46, y: -58 }; backFoot = { x: -65, y: -5 };
+  }
+  if (c.guarding) { frontKnee.x = 48; frontFoot.x = 66; backKnee.x = -48; backFoot.x = -61; }
+  if (hurt) { frontFoot.x += 30 * hurt; backFoot.x -= 25 * hurt; }
+
+  const legWidth = monster ? 29 : heavy ? 23 : youth ? 16 : 19;
+  segment(hipBack, backKnee, legWidth + 3, legWidth, dark, robot); segment(backKnee, backFoot, legWidth, legWidth - 3, dark, robot); if (!robot) bridge(backKnee, legWidth - 2, dark);
+  segment(backFoot, { x: backFoot.x + 24, y: backFoot.y + 1 }, legWidth - 4, legWidth - 6, boot, robot);
+  segment(hipFront, frontKnee, legWidth + 3, legWidth, dark, robot); segment(frontKnee, frontFoot, legWidth, legWidth - 3, dark, robot); if (!robot) bridge(frontKnee, legWidth - 2, dark);
+  segment(frontFoot, { x: frontFoot.x + 28, y: frontFoot.y + 1 }, legWidth - 3, legWidth - 6, boot, robot);
+  if (robot) { joint(frontKnee, 11, f.secondary); joint(backKnee, 11, f.secondary); }
+
+  const shoulderFront = { x: 35 + lean, y: shoulderY };
+  const shoulderBack = { x: -34 + lean, y: shoulderY + 4 };
+  let frontElbow = { x: 58 + lean, y: -166 + breath };
+  let frontHand = { x: 38 + lean, y: -119 + breath };
+  let backElbow = { x: -58 + lean, y: -165 + breath };
+  let backHand = { x: -35 + lean, y: -126 + breath };
+  if (moving) { frontElbow.x -= stride * 31; frontHand.x -= stride * 48; backElbow.x += stride * 31; backHand.x += stride * 48; }
+  if (isPunch) {
+    const heavyPunch = c.attack === "heavyPunch" || c.attack === "impact";
+    frontElbow = { x: lerp(58, heavyPunch ? 102 : 112, strike), y: lerp(-166, -205, strike) };
+    frontHand = { x: lerp(38, heavyPunch ? 184 : 164, strike), y: lerp(-119, -211, strike) };
+    backElbow = { x: -54, y: -188 }; backHand = { x: -6, y: -211 };
+  } else if (isSpecial) {
+    frontElbow = { x: 74 * recover, y: lerp(-166, -239, strike) }; frontHand = { x: 112 * recover, y: lerp(-119, -276, strike) };
+    backElbow = { x: -65 * recover, y: lerp(-165, -230, strike) }; backHand = { x: -102 * recover, y: lerp(-126, -263, strike) };
+  } else if (c.guarding) {
+    frontElbow = { x: 61, y: -193 }; frontHand = { x: 20, y: -236 };
+    backElbow = { x: -43, y: -191 }; backHand = { x: 13, y: -176 };
+  } else if (hurt) {
+    frontElbow = { x: 64, y: -184 }; frontHand = { x: 96, y: -228 };
+    backElbow = { x: -66, y: -175 }; backHand = { x: -98, y: -207 };
+  }
+
+  const armWidth = monster ? 27 : heavy ? 21 : youth ? 13 : 17;
+  segment(shoulderBack, backElbow, armWidth + 2, armWidth, f.secondary, robot); segment(backElbow, backHand, armWidth, armWidth - 3, f.secondary, robot); if (!robot) bridge(backElbow, armWidth - 2, f.secondary); joint(backHand, armWidth - 2, robot ? f.secondary : skinColor);
+
+  const torsoTop = heavy ? 57 : youth ? 40 : 48, torsoBottom = heavy ? 43 : youth ? 30 : 36;
+  const chestGradient = ctx.createLinearGradient(-50, shoulderY, 55, hipY); chestGradient.addColorStop(0, f.color); chestGradient.addColorStop(1, f.secondary);
+  ctx.beginPath(); ctx.moveTo(shoulderBack.x - 7, shoulderY - 6); ctx.quadraticCurveTo(lean, shoulderY - 25, shoulderFront.x + 7, shoulderY - 6); ctx.quadraticCurveTo(lean + torsoTop + 10, -168, hipFront.x + torsoBottom, hipY); ctx.quadraticCurveTo(lean, hipY + 18, hipBack.x - torsoBottom, hipY); ctx.quadraticCurveTo(lean - torsoTop - 10, -168, shoulderBack.x - 7, shoulderY - 6); ctx.closePath();
+  ctx.fillStyle = chestGradient; ctx.strokeStyle = outline; ctx.lineWidth = 7; ctx.fill(); ctx.stroke();
+  ctx.globalAlpha = .45; ctx.strokeStyle = "#effcff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(lean, shoulderY - 14); ctx.lineTo(lean, hipY + 7); ctx.moveTo(-torsoTop * .55 + lean, -171); ctx.lineTo(torsoTop * .55 + lean, -171); ctx.stroke(); ctx.globalAlpha = 1;
+
+  if (["zara", "nyx", "sable", "batu", "lux", "oren", "raku"].includes(f.id)) {
+    ctx.fillStyle = dark; ctx.strokeStyle = outline; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(-39 + lean, hipY - 10); ctx.lineTo(-58 + lean - stride * 8, -37); ctx.lineTo(-3 + lean, -85); ctx.lineTo(16 + lean, -34); ctx.lineTo(43 + lean, hipY - 10); ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  if (["atlas", "batu"].includes(f.id)) { ctx.strokeStyle = "#e8c17a"; ctx.lineWidth = 7; for (let y = shoulderY + 30; y < hipY - 12; y += 25) { ctx.beginPath(); ctx.moveTo(-34 + lean, y); ctx.lineTo(35 + lean, y); ctx.stroke(); } }
+  if (f.id === "kael") { joint({ x: 30 + lean, y: -185 }, 12, "#ffdd72"); }
+  if (f.id === "sable") { ctx.strokeStyle = "#d62646"; ctx.lineWidth = 10; ctx.beginPath(); ctx.moveTo(-20 + lean, shoulderY - 13); ctx.quadraticCurveTo(-85, -187, -112 - stride * 20, -135); ctx.stroke(); }
+  if (f.id === "raku") { ctx.fillStyle = "#b87943"; ctx.strokeStyle = outline; ctx.lineWidth = 4; ctx.beginPath(); ctx.ellipse(55 + lean, -132, 15, 22, -.2, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+
+  const frontArmColor = f.id === "kael" ? "#f26b25" : f.color;
+  segment(shoulderFront, frontElbow, armWidth + 2, armWidth, frontArmColor, robot); segment(frontElbow, frontHand, armWidth, armWidth - 3, frontArmColor, robot); if (!robot) bridge(frontElbow, armWidth - 2, frontArmColor); joint(frontHand, armWidth - 2, robot ? f.secondary : skinColor);
+  if (robot) { joint(frontElbow, 10, f.secondary); joint(backElbow, 10, f.secondary); }
+
+  const neck = { x: lean * .55, y: shoulderY - 19 };
+  segment(neck, { x: neck.x, y: neck.y - 23 }, youth ? 11 : 14, youth ? 10 : 12, skinColor);
+  const headX = lean * .62 + (hurt ? -11 : 0), headY = shoulderY - 58 + breath * .25;
+  ctx.fillStyle = robot ? "#2455c6" : monster ? "#4c5149" : skinColor; ctx.strokeStyle = outline; ctx.lineWidth = 6; ctx.beginPath(); ctx.ellipse(headX, headY, youth ? 25 : heavy ? 32 : 28, youth ? 30 : 34, hurt * .18, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  if (robot) { ctx.strokeStyle = f.secondary; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(headX, headY, 18, 0, Math.PI * 2); ctx.stroke(); }
+  else if (monster) { ctx.fillStyle = "#ffd06a"; ctx.beginPath(); ctx.arc(headX - 10, headY, 4, 0, Math.PI * 2); ctx.arc(headX + 10, headY, 4, 0, Math.PI * 2); ctx.fill(); }
+  else {
+    ctx.fillStyle = f.id === "raku" ? "#eee7db" : f.id === "lux" ? "#e9d6c4" : "#151522"; ctx.beginPath(); ctx.arc(headX, headY - 6, youth ? 27 : 31, Math.PI, Math.PI * 2); ctx.lineTo(headX + 22, headY - 8); ctx.lineTo(headX + 12, headY - 18); ctx.lineTo(headX, headY - 7); ctx.lineTo(headX - 14, headY - 18); ctx.lineTo(headX - 25, headY - 4); ctx.closePath(); ctx.fill();
+    if (["nyx", "sable", "lux"].includes(f.id)) { ctx.fillStyle = f.id === "lux" ? "#b65cff" : "#101523"; ctx.fillRect(headX - 23, headY - 5, 46, 13); ctx.strokeStyle = f.color; ctx.lineWidth = 2; ctx.strokeRect(headX - 20, headY - 3, 40, 9); }
+    else { ctx.fillStyle = "#111521"; ctx.fillRect(headX - 17, headY - 2, 9, 3); ctx.fillRect(headX + 8, headY - 2, 9, 3); }
+    if (elder) { ctx.fillStyle = "#eee7db"; ctx.beginPath(); ctx.moveTo(headX - 19, headY + 9); ctx.quadraticCurveTo(headX, headY + 47, headX + 20, headY + 9); ctx.quadraticCurveTo(headX + 12, headY + 39, headX, headY + 31); ctx.quadraticCurveTo(headX - 12, headY + 39, headX - 19, headY + 9); ctx.fill(); }
+  }
+
+  if (isSpecial) { ctx.globalAlpha = .22 + strike * .34; ctx.strokeStyle = f.color; for (let ring = 0; ring < 3; ring++) { ctx.lineWidth = 5 - ring; ctx.beginPath(); ctx.arc(lean, -160, 72 + ring * 22 + strike * 15, -1.25, 1.25); ctx.stroke(); } ctx.globalAlpha = 1; }
+  ctx.restore();
 }
 
 type SpritePose = "idle" | "punch" | "kick" | "special" | "guard" | "hurt";

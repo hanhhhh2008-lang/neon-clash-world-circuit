@@ -30,14 +30,18 @@ button { color: inherit; }
 
 .versus-preview { min-height: 630px; display: grid; grid-template-columns: 1fr 80px 1fr; border: 1px solid var(--line); background: rgba(6,10,25,.8); position: relative; overflow: hidden; clip-path: polygon(16px 0,100% 0,100% calc(100% - 16px),calc(100% - 16px) 100%,0 100%,0 16px); }
 .versus-preview::before { content: ""; position: absolute; inset: 0; background: linear-gradient(120deg, rgba(39,244,255,.08), transparent 45%, rgba(255,45,186,.08)); pointer-events: none; }
+.versus-preview.solo-preview { grid-template-columns: 1fr; }
+.solo-preview .fighter-panel { background: linear-gradient(120deg, color-mix(in srgb, var(--fighter) 15%, transparent), transparent 64%); }
+.solo-preview .hero-mark { flex-basis: 40%; }
+.solo-preview .fighter-copy { max-width: 700px; padding-right: 7vw; }
 .fighter-panel { min-width: 0; position: relative; display: flex; align-items: flex-end; overflow: hidden; background: linear-gradient(135deg, color-mix(in srgb, var(--fighter) 10%, transparent), transparent 55%); }
 .fighter-panel.cpu { flex-direction: row-reverse; text-align: right; background: linear-gradient(225deg, color-mix(in srgb, var(--fighter) 10%, transparent), transparent 55%); }
 .panel-no { position: absolute; top: 22px; left: 25px; font-weight: 900; font-size: 11px; letter-spacing: .18em; color: var(--fighter); }
 .cpu .panel-no { left: auto; right: 25px; }
 .hero-mark { flex: 0 0 48%; height: 100%; position: relative; overflow: hidden; filter: drop-shadow(0 0 34px color-mix(in srgb, var(--fighter) 28%, transparent)); background: radial-gradient(circle at 50% 58%, color-mix(in srgb, var(--fighter) 24%, transparent), transparent 64%); }
 .hero-mark::after { content: ""; position: absolute; inset: auto 5% 0; height: 22%; background: linear-gradient(transparent, color-mix(in srgb, var(--fighter) 18%, #030611)); pointer-events: none; }
-.fighter-portrait { display: block; background-repeat: no-repeat; background-size: auto 100%; background-color: #070b17; }
-.fighter-portrait.hero { position: absolute; inset: 4% -10% 0; height: 96%; background-color: transparent; filter: saturate(1.12) contrast(1.04); }
+.fighter-portrait { display: block; background-repeat: no-repeat; background-color: #070b17; }
+.fighter-portrait.hero { position: absolute; top: 2%; bottom: 0; left: 50%; height: 98%; width: auto; transform: translateX(-50%); background-color: transparent; filter: saturate(1.12) contrast(1.04); }
 .cpu .fighter-portrait.hero { transform: scaleX(-1); }
 .fighter-copy { position: relative; z-index: 2; flex: 1; padding: 60px 28px 35px; }
 .fighter-copy > p { color: var(--fighter); font-size: 9px; letter-spacing: .18em; font-weight: 900; }
@@ -71,14 +75,14 @@ button { color: inherit; }
 
 .roster-wrap, .stage-select { margin-top: 18px; border: 1px solid var(--line); background: #080d1b; }
 .roster-label { min-height: 42px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; color: #8291aa; border-bottom: 1px solid var(--line); font-size: 9px; letter-spacing: .16em; font-weight: 900; }
-.roster-label button { color: var(--cyan); background: none; border: 0; font-size: 8px; letter-spacing: .12em; cursor: pointer; }
+.roster-label button, .roster-label small { color: var(--cyan); background: none; border: 0; font-size: 8px; letter-spacing: .12em; }
+.roster-label button { cursor: pointer; }
 .roster-grid { display: grid; grid-template-columns: repeat(8, 1fr); }
 .fighter-card { min-width: 0; height: 190px; position: relative; border: 0; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: #0a1021; overflow: hidden; cursor: pointer; text-align: left; transition: background .18s, transform .18s; }
 .fighter-card:nth-child(8n) { border-right: 0; }
 .fighter-card:nth-child(n+9) { border-bottom: 0; }
 .fighter-card:hover { background: color-mix(in srgb, var(--fighter) 13%, #0a1021); transform: translateY(-4px); }
 .fighter-card.is-selected { background: linear-gradient(145deg, color-mix(in srgb, var(--fighter) 34%, #091326), #091326); box-shadow: inset 0 -4px var(--fighter); }
-.fighter-card.is-rival::after { content: "CPU"; position: absolute; top: 8px; right: 7px; color: var(--fighter); font-size: 7px; font-weight: 950; letter-spacing: .1em; }
 .fighter-number { position: absolute; top: 8px; left: 8px; color: #596a86; font-size: 8px; }
 .fighter-portrait.compact { position: absolute; inset: 0; height: 100%; background-color: #080d1b; opacity: .88; transition: transform .2s, filter .2s; }
 .fighter-card:hover .fighter-portrait.compact, .fighter-card.is-selected .fighter-portrait.compact { transform: scale(1.06); filter: saturate(1.25) brightness(1.08); }
@@ -165,8 +169,13 @@ kbd { min-width: 31px; padding: 7px 6px; text-align: center; background: #10182b
 .slot-row i { color: var(--magenta); text-align: center; font: italic 950 28px Arial; }
 .room-metrics { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; padding: 16px 0; }
 .room-metrics span { border: 1px solid #34415b; padding: 8px 11px; color: #91a2bc; font-size: 8px; letter-spacing: .13em; }
+.invite-strip { display: grid; gap: 7px; margin: 0 auto 15px; max-width: 720px; }
+.invite-strip label { color: var(--cyan); font-size: 8px; font-weight: 900; letter-spacing: .16em; }
+.invite-strip input { width: 100%; border: 1px solid #344c6e; background: #030611; color: #c8faff; padding: 12px; font: 800 11px/1.2 monospace; text-transform: none; letter-spacing: .03em; }
+.invite-strip small { color: #7f90aa; font-size: 8px; letter-spacing: .07em; }
 .room-actions { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
-.room-actions button, .open-room-list button { border: 1px solid #3b4b68; background: #111a2d; color: #d8e5f3; padding: 11px 14px; font-size: 8px; letter-spacing: .12em; font-weight: 900; cursor: pointer; }
+.room-actions button, .room-actions a, .open-room-list button { border: 1px solid #3b4b68; background: #111a2d; color: #d8e5f3; padding: 11px 14px; font-size: 8px; letter-spacing: .12em; font-weight: 900; cursor: pointer; text-decoration: none; }
+.room-actions a { border-color: var(--cyan); color: var(--cyan); }
 .open-room-list { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 14px; }
 .open-room-list > b { display: block; color: #7888a3; font-size: 8px; letter-spacing: .16em; margin-bottom: 8px; }
 .open-room-list > div { display: flex; align-items: center; gap: 12px; border: 1px solid #27334c; margin-top: 6px; padding: 9px; }

@@ -37,9 +37,11 @@ export default defineConfig(async () => {
       })];
 
   return {
-    server: isCodexSeatbeltSandbox
-      ? { watch: { useFsEvents: false, usePolling: true } }
-      : undefined,
+    server: {
+      host: "0.0.0.0",
+      ...(isCodexSeatbeltSandbox ? { watch: { useFsEvents: false, usePolling: true } } : {}),
+    },
+    preview: { host: "0.0.0.0" },
     resolve: isOfflineWindowsPreview
       ? { alias: { "cloudflare:workers": resolve("build/cloudflare-workers-local.ts") } }
       : undefined,

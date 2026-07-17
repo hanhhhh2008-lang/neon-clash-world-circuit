@@ -42,6 +42,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <link rel="preload" href="/characters/kael-combat-sprites-v2.png" as="image" />
+        <link rel="preload" href="/characters/zara-combat-sprites-v2.png" as="image" />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

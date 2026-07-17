@@ -21,10 +21,10 @@ test("declares the requested keyboard controls and signature combos", async () =
     'KeyD: "right"',
     'KeyW: "jump"',
     'KeyS: "crouch"',
-    'KeyU: "lightPunch"',
-    'KeyI: "heavyPunch"',
-    'KeyJ: "lightKick"',
-    'KeyK: "heavyKick"',
+    'KeyY: "lightPunch"',
+    'KeyU: "heavyPunch"',
+    'KeyI: "lightKick"',
+    'KeyL: "heavyKick"',
   ]) {
     assert.match(source, new RegExp(declaration.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
@@ -37,10 +37,28 @@ test("declares the requested keyboard controls and signature combos", async () =
   assert.match(source, /14-year-old academy champion/);
   assert.match(source, /TIPSY SAGE/);
   assert.match(source, /CINEMATIC FINISH/);
-  assert.match(source, /SIGNATURE SPECIAL/);
-  assert.match(source, /CANCEL CHAIN/);
+  assert.match(source, /LONG-RANGE SPECIAL/);
+  assert.match(source, /CANCEL COMBO/);
   assert.match(source, /actionSeq/);
   assert.match(source, /guardMeter/);
+  assert.match(source, /queuedAttack/);
+  assert.match(source, /LONG-RANGE SPECIAL/);
+  assert.match(source, /comboFinished \? "special"/);
+  assert.doesNotMatch(source, /const artSheets/);
+  assert.match(source, /illustratedSprites/);
+  assert.doesNotMatch(source, /else drawArticulatedFighter/);
+});
+
+test("renders one clear fighter per selection tile", async () => {
+  const [game, styles] = await Promise.all([
+    readFile(new URL("../app/neon-clash.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(game, /backgroundSize: `\$\{total \* 100\}% auto`/);
+  assert.match(game, /ONE ACTIVE SELECTION/);
+  assert.match(styles, /versus-preview\.solo-preview/);
+  assert.doesNotMatch(game, /rival=\{fighter\.id === cpuId\}/);
+  assert.doesNotMatch(styles, /fighter-card\.is-rival/);
 });
 
 test("includes persistent two-player rooms and spectator APIs", async () => {
@@ -61,4 +79,8 @@ test("includes persistent two-player rooms and spectator APIs", async () => {
   assert.match(input, /stale-input/);
   assert.match(state, /UPDATE rooms SET state/);
   assert.match(schema, /spectators/);
+  assert.match(room, /staleGuest/);
+  const game = await readFile(new URL("../app/neon-clash.tsx", import.meta.url), "utf8");
+  assert.match(game, /autoJoinAttemptedRef/);
+  assert.match(game, /PLAYER 2 AUTO-JOIN LINK/);
 });
