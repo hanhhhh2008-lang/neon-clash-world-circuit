@@ -90,4 +90,15 @@ test("includes persistent two-player rooms and spectator APIs", async () => {
   const game = await readFile(new URL("../app/neon-clash.tsx", import.meta.url), "utf8");
   assert.match(game, /autoJoinAttemptedRef/);
   assert.match(game, /PLAYER 2 AUTO-JOIN LINK/);
+  assert.match(game, /applyRemoteSnapshot\(true\)/);
+  assert.match(game, /INPUT PREDICTION/);
+  assert.match(game, /updateCombatant\(p2, p1, predictedMove, predicted, dt\)/);
+});
+
+test("adds responsive fighting-game feedback", async () => {
+  const game = await readFile(new URL("../app/neon-clash.tsx", import.meta.url), "utf8");
+  assert.match(game, /hitStop/);
+  assert.match(game, /COUNTER HIT/);
+  assert.match(game, /HEAVY IMPACT/);
+  assert.match(game, /COMMAND MEMORY/);
 });

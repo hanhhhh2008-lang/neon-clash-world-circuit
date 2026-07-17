@@ -536,6 +536,10 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
     let finisherTime = 0;
     let finisherName = "";
     let finisherColor = player.color;
+    let hitStop = 0;
+    let impactFlash = 0;
+    let combatCallout = "";
+    let combatCalloutTime = 0;
 
     const recordAction = (key: string): Combatant["attack"] => {
       const now = performance.now(); inputHistory.push({ key, at: now });
@@ -561,10 +565,12 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       target.guardMeter = value.guardMeter ?? 100; target.evadeTime = value.evadeTime ?? 0;
     };
 
-    const applyRemoteSnapshot = () => {
-      const snapshot = remoteStateRef.current; if (!snapshot) return;
+    const applyRemoteSnapshot = (onlyWhenNew = false) => {
+      const snapshot = remoteStateRef.current; if (!snapshot) return false;
       const nextSequence = Number(snapshot.sequence ?? 0);
-      if (nextSequence !== lastAppliedRemoteSequence) { lastAppliedRemoteSequence = nextSequence; remoteSnapshotReceivedAt = performance.now(); }
+      const isNew = nextSequence !== lastAppliedRemoteSequence;
+      if (onlyWhenNew && !isNew) return false;
+      if (isNew) { lastAppliedRemoteSequence = nextSequence; remoteSnapshotReceivedAt = performance.now(); }
       const prediction = Math.min(0.1, Math.max(0, (performance.now() - remoteSnapshotReceivedAt) / 1000));
       applyCombatantSnapshot(p1, snapshot.p1); applyCombatantSnapshot(p2, snapshot.p2); timer = snapshot.timer; round = snapshot.round; roundState = snapshot.roundState;
       for (const combatant of [p1, p2]) {
@@ -576,6 +582,7 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       }
       projectiles.length = 0;
       for (const item of snapshot.projectiles ?? []) projectiles.push({ ...item, x: item.x + item.vx * prediction, life: Math.max(0, item.life - prediction), owner: item.owner === 1 ? p1 : p2 });
+      return true;
     };
 
     const combatantSnapshot = (value: Combatant): CombatantSnapshot => ({ x: value.x, y: value.y, vx: value.vx, vy: value.vy, facing: value.facing, health: value.health, drive: value.drive, grounded: value.grounded, crouching: value.crouching, guarding: value.guarding, attack: value.attack, attackTime: value.attackTime, attackHit: value.attackHit, hurtTime: value.hurtTime, stunTime: value.stunTime, flashTime: value.flashTime, combo: value.combo, comboWindow: value.comboWindow, guardMeter: value.guardMeter, evadeTime: value.evadeTime, wins: value.wins });
@@ -612,6 +619,7 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
     const hit = (attacker: Combatant, defender: Combatant, damage: number, force: number, color: string, impact = false) => {
       if (defender.hurtTime > 0.02 || defender.evadeTime > 0.06 || roundState !== "fight") return;
       const blocked = defender.guarding && defender.grounded && defender.facing === -attacker.facing;
+      const counter = !blocked && !!defender.attack;
       const dealt = blocked ? damage * 0.28 : damage;
       defender.health = clamp(defender.health - dealt, 0, 100);
       defender.drive = clamp(defender.drive - (blocked ? 7 : 3), 0, 100);
@@ -627,6 +635,10 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       attacker.combo = attacker.comboWindow > 0 ? attacker.combo + 1 : 1;
       attacker.comboWindow = 0.8;
       shake = Math.max(shake, impact ? 13 : blocked ? 2 : 6);
+      hitStop = Math.max(hitStop, blocked ? 0.025 : impact ? 0.09 : 0.052);
+      impactFlash = Math.max(impactFlash, impact ? 0.16 : blocked ? 0.045 : 0.09);
+      combatCallout = blocked ? "GUARD" : counter ? "COUNTER HIT" : impact ? "HEAVY IMPACT" : attacker.combo > 2 ? `${attacker.combo} HIT CHAIN` : "CLEAN HIT";
+      combatCalloutTime = blocked ? 0.25 : impact || counter ? 0.68 : 0.42;
       burst(defender.x, defender.y - 112, blocked ? "#e8fbff" : color, blocked ? 6 : impact ? 22 : 12);
     };
 
@@ -703,7 +715,20 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
     };
 
     const update = (dt: number) => {
-      if (mode === "ONLINE" && role !== "host") { applyRemoteSnapshot(); return; }
+      impactFlash = Math.max(0, impactFlash - dt); combatCalloutTime = Math.max(0, combatCalloutTime - dt);
+      if (hitStop > 0) { hitStop = Math.max(0, hitStop - dt); return; }
+      if (mode === "ONLINE" && role !== "host") {
+        if (role === "spectator") { applyRemoteSnapshot(); return; }
+        // Player 2 immediately simulates their own controls between authoritative
+        // host snapshots. Each new snapshot reconciles the prediction.
+        applyRemoteSnapshot(true);
+        const predicted = { jump: !!inputs.jump, crouch: !!inputs.crouch, guard: !!inputs.guard, evade: !!inputs.evade, lightPunch: !!inputs.lightPunch, heavyPunch: !!inputs.heavyPunch, lightKick: !!inputs.lightKick, heavyKick: !!inputs.heavyKick, special: !!inputs.special, impact: !!inputs.impact, super: !!inputs.super };
+        const predictedMove = (inputs.left ? -1 : 0) + (inputs.right ? 1 : 0);
+        updateCombatant(p2, p1, predictedMove, predicted, dt);
+        p1.x = clamp(p1.x + p1.vx * dt, 82, W - 82);
+        p1.attackTime += p1.attack ? dt : 0;
+        return;
+      }
       if (roundState === "intro") { stateTimer -= dt; if (stateTimer <= 0) roundState = "fight"; }
       else if (roundState === "fight") timer = Math.max(0, timer - dt);
       else if (roundState === "ko") {
@@ -848,6 +873,16 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       for (const q of particles) { const alpha = clamp(q.life / q.maxLife, 0, 1); ctx.globalAlpha = alpha; ctx.shadowBlur = 12; ctx.shadowColor = q.color; ctx.strokeStyle = q.color; ctx.lineWidth = Math.max(1.5, q.size * .55); ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x - q.vx * .035, q.y - q.vy * .035); ctx.stroke(); }
       ctx.restore(); ctx.globalAlpha = 1; ctx.shadowBlur = 0;
       drawHud();
+      if (inputHistory.length) {
+        const recent = inputHistory.slice(-6).map((item) => item.key).join("  ›  ");
+        ctx.textAlign = "left"; ctx.font = "800 12px Arial"; ctx.fillStyle = "rgba(232,251,255,.74)";
+        ctx.fillText(`COMMAND MEMORY  //  ${recent}`, 50, H - 26);
+      }
+      if (impactFlash > 0) { ctx.globalAlpha = clamp(impactFlash * 2.8, 0, .32); ctx.fillStyle = "#f4ffff"; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+      if (combatCalloutTime > 0) {
+        ctx.textAlign = "center"; ctx.shadowBlur = 18; ctx.shadowColor = finisherColor; ctx.fillStyle = "#f4ffff"; ctx.font = "italic 950 24px Arial";
+        ctx.fillText(combatCallout, W / 2, 232); ctx.shadowBlur = 0;
+      }
       if (roundState === "intro") drawCenterText(`ROUND ${round}`, "FIGHT");
       if (roundState === "ko") drawCenterText("K.O.", p1.health > p2.health ? p1.fighter.name : p2.fighter.name);
       if (comboCallout > 0) { ctx.textAlign = "center"; ctx.shadowBlur = 24; ctx.shadowColor = p1.fighter.color; ctx.fillStyle = p1.fighter.color; ctx.font = "italic 900 34px Arial"; ctx.fillText(activeComboName, W / 2, 175); ctx.shadowBlur = 0; ctx.font = "800 13px Arial"; ctx.fillStyle = "#eefcff"; ctx.fillText("PERFECT CHAIN — FINISHER DEPLOYED", W / 2, 200); }
@@ -938,7 +973,7 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
   return (
     <div className="arena-wrap">
       <canvas ref={canvasRef} aria-label={`${player.name} versus ${cpu.name} fighting arena`} />
-      {mode === "ONLINE" && <div className="room-hud">{role === "spectator" ? "● WATCHING LIVE" : role === "host" ? "P1 // HOST" : "P2 // CHALLENGER"}</div>}
+      {mode === "ONLINE" && <div className="room-hud">{role === "spectator" ? "● WATCHING LIVE" : role === "host" ? "P1 // HOST · AUTHORITATIVE" : "P2 // CHALLENGER · INPUT PREDICTION"}</div>}
       {role !== "spectator" && <div className="touch-controls" aria-label="Touch controls">
         <div className="touch-move"><TouchButton label="◀" control="left" setControl={setControl} /><TouchButton label="▲" control="jump" setControl={setControl} /><TouchButton label="▼" control="crouch" setControl={setControl} /><TouchButton label="▶" control="right" setControl={setControl} /><TouchButton label="EV" control="evade" setControl={setControl} /></div>
         <div className="touch-action"><TouchButton label="LP" control="lightPunch" setControl={setControl} /><TouchButton label="HP" control="heavyPunch" setControl={setControl} /><TouchButton label="LK" control="lightKick" setControl={setControl} /><TouchButton label="HK" control="heavyKick" setControl={setControl} /><TouchButton label="SP" control="special" setControl={setControl} /><TouchButton label="GD" control="guard" setControl={setControl} /></div>
