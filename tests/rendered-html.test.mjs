@@ -21,10 +21,10 @@ test("declares the requested keyboard controls and signature combos", async () =
     'KeyD: "right"',
     'KeyW: "jump"',
     'KeyS: "crouch"',
-    'KeyY: "lightPunch"',
-    'KeyU: "heavyPunch"',
-    'KeyI: "lightKick"',
-    'KeyL: "heavyKick"',
+    'KeyU: "lightPunch"',
+    'KeyI: "heavyPunch"',
+    'KeyO: "lightKick"',
+    'Semicolon: "heavyKick"',
   ]) {
     assert.match(source, new RegExp(declaration.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
@@ -37,12 +37,11 @@ test("declares the requested keyboard controls and signature combos", async () =
   assert.match(source, /14-year-old academy champion/);
   assert.match(source, /TIPSY SAGE/);
   assert.match(source, /CINEMATIC FINISH/);
-  assert.match(source, /LONG-RANGE SPECIAL/);
-  assert.match(source, /CANCEL COMBO/);
+  assert.match(source, /FIREBALL \/ LONG RANGE/);
+  assert.match(source, /RUSH COMBO/);
   assert.match(source, /actionSeq/);
   assert.match(source, /guardMeter/);
   assert.match(source, /queuedAttack/);
-  assert.match(source, /LONG-RANGE SPECIAL/);
   assert.match(source, /comboAction \?\? initialAction/);
   assert.doesNotMatch(source, /const artSheets/);
   assert.match(source, /buildLiveCombatPortrait/);
@@ -54,6 +53,7 @@ test("declares the requested keyboard controls and signature combos", async () =
   assert.equal([...advancedComboBlock[1].matchAll(/name: "/g)].length, 12);
   assert.match(source, /12 ADVANCED COMBOS/);
   assert.match(source, /WORLD CIRCUIT FINALE/);
+  assert.match(source, /RUSH COMBO/);
 });
 
 test("renders one clear fighter per selection tile", async () => {
@@ -101,4 +101,17 @@ test("adds responsive fighting-game feedback", async () => {
   assert.match(game, /COUNTER HIT/);
   assert.match(game, /HEAVY IMPACT/);
   assert.match(game, /COMMAND MEMORY/);
+});
+
+test("implements the advanced GDD combat engine", async () => {
+  const game = await readFile(new URL("../app/neon-clash.tsx", import.meta.url), "utf8");
+  for (const state of ["idle", "walking", "crouching", "jumping", "attacking", "blocking", "blockstun", "hitstun", "hardKnockdown", "juggle", "dashing", "maxMode"]) assert.match(game, new RegExp(`"${state}"`));
+  for (const box of ["pushbox", "hurtboxes", "hitboxes", "throwbox"]) assert.match(game, new RegExp(box));
+  assert.match(game, /startup: 3/);
+  assert.match(game, /startup: 8/);
+  assert.match(game, /inputRing\.length > 30/);
+  assert.match(game, /activateMaxMode/);
+  assert.match(game, /lastMoveTap/);
+  assert.match(game, /difficulty === "ROOKIE" \? 1\.15/);
+  for (const stage of ["NEON CYBERPUNK ALLEY", "ABANDONED SUBWAY", "ANCIENT SHAOLIN DOJO", "DESERTED OIL RIG", "ROOFTOP SUNSET", "UNDERGROUND FIGHT CLUB", "HIMALAYAN PEAK", "VOLCANIC CAVERN", "COLOSSEUM RUINS", "HIGH-TECH LAB"]) assert.match(game, new RegExp(stage));
 });

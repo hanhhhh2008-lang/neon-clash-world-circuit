@@ -27,6 +27,8 @@ type Fighter = {
 
 type Stage = { id: string; name: string; city: string; descriptor: string; color: string; accent: string; motif: "skyline" | "rail" | "market" | "forge" | "club" | "court" | "plaza" | "steppe" | "metro" | "harbour" };
 type Outfit = { id: string; name: string; note: string; cut: "classic" | "sleek" | "heatwave" };
+type FighterState = "idle" | "walking" | "crouching" | "jumping" | "attacking" | "blocking" | "blockstun" | "hitstun" | "hardKnockdown" | "juggle" | "dashing" | "maxMode";
+type CombatBox = { x: number; y: number; width: number; height: number };
 
 type Combatant = {
   fighter: Fighter;
@@ -52,6 +54,13 @@ type Combatant = {
   evadeTime: number;
   queuedAttack: Combatant["attack"];
   queuedTime: number;
+  state: FighterState;
+  blockstunTime: number;
+  knockdownTime: number;
+  invulnTime: number;
+  dashTime: number;
+  maxModeTime: number;
+  superMeter: number;
   wins: number;
 };
 
@@ -88,16 +97,16 @@ const FIGHTERS: Fighter[] = [
 ];
 
 const STAGES: Stage[] = [
-  { id: "shibuya", name: "NEON CROSSING", city: "TOKYO", descriptor: "Rain / Midnight", color: "#27f4ff", accent: "#ff2dba", motif: "skyline" },
-  { id: "hyperrail", name: "HYPERRAIL 88", city: "SEOUL", descriptor: "Transit / 02:14", color: "#3e9dff", accent: "#d8ff47", motif: "rail" },
-  { id: "stormmarket", name: "STORM MARKET", city: "LAGOS", descriptor: "Monsoon / Live", color: "#ffbd31", accent: "#ff2dba", motif: "market" },
-  { id: "aegis", name: "AEGIS FOUNDRY", city: "ATHENS", descriptor: "Smelter / Shift 3", color: "#ff623e", accent: "#ffd24a", motif: "forge" },
-  { id: "voidclub", name: "VOID CLUB", city: "BERLIN", descriptor: "Sublevel / 140 BPM", color: "#a26cff", accent: "#27f4ff", motif: "club" },
-  { id: "skycourt", name: "SKY COURT", city: "SÃO PAULO", descriptor: "Rooftop / Sunset", color: "#d8ff47", accent: "#28e2a0", motif: "court" },
-  { id: "solarplaza", name: "SOLAR PLAZA", city: "MEXICO CITY", descriptor: "Festival / Golden Hour", color: "#ff405c", accent: "#ffb12b", motif: "plaza" },
-  { id: "steppe", name: "STEPPE SHRINE", city: "ULAANBAATAR", descriptor: "High Wind / Dawn", color: "#41d7bf", accent: "#c9f5ff", motif: "steppe" },
-  { id: "prismmetro", name: "PRISM METRO", city: "PARIS", descriptor: "Platform / Last Train", color: "#ffdc4a", accent: "#ff4da9", motif: "metro" },
-  { id: "tidal", name: "TIDAL OPERA", city: "SYDNEY", descriptor: "Harbour / Blue Hour", color: "#48a8ff", accent: "#42f5c5", motif: "harbour" },
+  { id: "shibuya", name: "NEON CYBERPUNK ALLEY", city: "TOKYO", descriptor: "Rain / Neon Midnight", color: "#27f4ff", accent: "#ff2dba", motif: "skyline" },
+  { id: "hyperrail", name: "ABANDONED SUBWAY", city: "NEW YORK", descriptor: "Flicker / Graffiti", color: "#3e9dff", accent: "#d8ff47", motif: "rail" },
+  { id: "stormmarket", name: "ANCIENT SHAOLIN DOJO", city: "HENAN", descriptor: "Incense / Wooden Hall", color: "#ffbd31", accent: "#ff2dba", motif: "market" },
+  { id: "aegis", name: "DESERTED OIL RIG", city: "NORTH SEA", descriptor: "Storm / Ocean Surge", color: "#ff623e", accent: "#ffd24a", motif: "forge" },
+  { id: "skycourt", name: "ROOFTOP SUNSET", city: "DUBAI", descriptor: "Helipad / Golden Hour", color: "#d8ff47", accent: "#28e2a0", motif: "court" },
+  { id: "voidclub", name: "UNDERGROUND FIGHT CLUB", city: "BERLIN", descriptor: "Steel Cage / Live Crowd", color: "#a26cff", accent: "#27f4ff", motif: "club" },
+  { id: "steppe", name: "HIMALAYAN PEAK", city: "NEPAL", descriptor: "Snow / Temple Ruins", color: "#41d7bf", accent: "#c9f5ff", motif: "steppe" },
+  { id: "tidal", name: "VOLCANIC CAVERN", city: "KRAKATOA", descriptor: "Lava Pools / Deep Core", color: "#ff7438", accent: "#ffd24a", motif: "harbour" },
+  { id: "solarplaza", name: "COLOSSEUM RUINS", city: "ROME", descriptor: "Pillars / Midday", color: "#ff405c", accent: "#ffb12b", motif: "plaza" },
+  { id: "prismmetro", name: "HIGH-TECH LAB", city: "ORBITAL SECTOR", descriptor: "Glass Tubes / Final Boss", color: "#ffdc4a", accent: "#ff4da9", motif: "metro" },
 ];
 
 const OUTFITS: Outfit[] = [
@@ -106,29 +115,31 @@ const OUTFITS: Outfit[] = [
   { id: "heatwave", name: "HEATWAVE", note: "Bold summer look", cut: "heatwave" },
 ];
 
-const CONTROL_LABELS = [["A / D", "MOVE / BACK GUARD"], ["W / S", "JUMP / CROUCH"], ["Y", "LIGHT PUNCH"], ["U", "PUNCH"], ["I", "KICK"], ["L", "HEAVY KICK"], ["E", "EVASIVE ROLL"], ["SPACE", "GUARD"]];
-const COMMAND_LABELS = [["↓ ↘ → + Y/U/I/L", "LONG-RANGE SPECIAL"], ["→ ↓ ↘ + Y/U", "RISING COUNTER"], ["↓ ↘ → ×2 + U/L", "CINEMATIC SUPER"], ["U + L", "BLOWBACK"], ["Y → U → I → L", "CANCEL COMBO"], ["O / P", "SPECIAL / SUPER SHORTCUTS"]];
+const CONTROL_LABELS = [["A / D", "MOVE / AUTO-BLOCK"], ["W / S", "JUMP / CROUCH"], ["U", "LIGHT PUNCH"], ["I", "HEAVY PUNCH"], ["O", "LIGHT KICK"], [";", "HEAVY KICK"], ["E", "EVASIVE ROLL"], ["SPACE", "GUARD"]];
+const COMMAND_LABELS = [["S › D › U", "FIREBALL / LONG RANGE"], ["D › S › D + I", "DRAGON PUNCH"], ["U › U › U › U", "RUSH COMBO"], ["U + I", "EX SPECIAL · ½ BAR"], ["O + ;", "MAX MODE · 1 BAR"], ["A/A or D/D", "DASH / BACKDASH"]];
 const ADVANCED_COMBOS: ComboRoute[] = [
-  { name: "FLASHPOINT RUSH", sequence: ["Y", "Y", "U", "I"], finisher: "impact", bonus: 8, drive: 22 },
-  { name: "CROSSWIND BREAK", sequence: ["Y", "Y", "I", "L"], finisher: "heavyKick", bonus: 7, drive: 16 },
-  { name: "VOLT HAMMER", sequence: ["Y", "U", "U", "L"], finisher: "impact", bonus: 10, drive: 24 },
-  { name: "ORBITAL SWITCH", sequence: ["Y", "U", "L", "I"], finisher: "special", bonus: 12, drive: 28 },
-  { name: "PRISM DRIVER", sequence: ["Y", "I", "U", "U"], finisher: "special", bonus: 11, drive: 27 },
-  { name: "NIGHTFALL SWEEP", sequence: ["Y", "I", "L", "L"], finisher: "heavyKick", bonus: 9, drive: 18 },
-  { name: "TITAN ASCENT", sequence: ["U", "Y", "Y", "L"], finisher: "impact", bonus: 12, drive: 26 },
-  { name: "ZERO SIGNAL", sequence: ["U", "Y", "U", "I"], finisher: "special", bonus: 13, drive: 30 },
-  { name: "BLUE SKY CRUSH", sequence: ["U", "U", "I", "L"], finisher: "impact", bonus: 14, drive: 30 },
-  { name: "EVENT HORIZON", sequence: ["U", "I", "I", "L"], finisher: "super", bonus: 16, drive: 68 },
-  { name: "COMET BARRAGE", sequence: ["I", "Y", "Y", "U"], finisher: "special", bonus: 12, drive: 28 },
-  { name: "WORLD CIRCUIT FINALE", sequence: ["I", "U", "Y", "L"], finisher: "super", bonus: 18, drive: 72 },
+  { name: "RUSH COMBO", sequence: ["U", "U", "U", "U"], finisher: "special", bonus: 10, drive: 28 },
+  { name: "FLASHPOINT RUSH", sequence: ["U", "U", "I", "O"], finisher: "impact", bonus: 8, drive: 22 },
+  { name: "CROSSWIND BREAK", sequence: ["U", "U", "O", ";"], finisher: "heavyKick", bonus: 7, drive: 16 },
+  { name: "VOLT HAMMER", sequence: ["U", "I", "I", ";"], finisher: "impact", bonus: 10, drive: 24 },
+  { name: "ORBITAL SWITCH", sequence: ["U", "I", ";", "O"], finisher: "special", bonus: 12, drive: 28 },
+  { name: "PRISM DRIVER", sequence: ["U", "O", "I", "I"], finisher: "special", bonus: 11, drive: 27 },
+  { name: "NIGHTFALL SWEEP", sequence: ["U", "O", ";", ";"], finisher: "heavyKick", bonus: 9, drive: 18 },
+  { name: "TITAN ASCENT", sequence: ["I", "U", "U", ";"], finisher: "impact", bonus: 12, drive: 26 },
+  { name: "ZERO SIGNAL", sequence: ["I", "U", "I", "O"], finisher: "special", bonus: 13, drive: 30 },
+  { name: "BLUE SKY CRUSH", sequence: ["I", "I", "O", ";"], finisher: "impact", bonus: 14, drive: 30 },
+  { name: "EVENT HORIZON", sequence: ["I", "O", "O", ";"], finisher: "super", bonus: 16, drive: 68 },
+  { name: "WORLD CIRCUIT FINALE", sequence: ["O", "I", "U", ";"], finisher: "super", bonus: 18, drive: 72 },
 ];
 
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 function createCombatant(fighter: Fighter, x: number, facing: 1 | -1): Combatant {
-  return { fighter, x, y: 566, vx: 0, vy: 0, facing, health: 100, drive: 65, grounded: true, crouching: false, guarding: false, attack: null, attackTime: 0, attackHit: false, hurtTime: 0, stunTime: 0, flashTime: 0, combo: 0, comboWindow: 0, guardMeter: 100, evadeTime: 0, queuedAttack: null, queuedTime: 0, wins: 0 };
+  return { fighter, x, y: 566, vx: 0, vy: 0, facing, health: 100, drive: 65, grounded: true, crouching: false, guarding: false, attack: null, attackTime: 0, attackHit: false, hurtTime: 0, stunTime: 0, flashTime: 0, combo: 0, comboWindow: 0, guardMeter: 100, evadeTime: 0, queuedAttack: null, queuedTime: 0, state: "idle", blockstunTime: 0, knockdownTime: 0, invulnTime: 0, dashTime: 0, maxModeTime: 0, superMeter: 100, wins: 0 };
 }
+
+const normalizeComboSequence = (sequence: string[]) => sequence.map((key) => ({ Y: "U", U: "I", I: "O", L: ";" }[key] ?? key));
 
 function portraitStyle(fighter: Fighter) {
   return { "--fighter": fighter.color, "--fighter-2": fighter.secondary } as React.CSSProperties;
@@ -455,7 +466,7 @@ function FighterPanel({ fighter, outfit, side }: { fighter: Fighter; outfit: Out
         <div className="stat-row"><Stat label="SPD" value={fighter.speed} /><Stat label="PWR" value={fighter.power} /><Stat label="RNG" value={fighter.reach} /></div>
         <div className="special-tag"><span>SPECIAL</span><strong>{fighter.special}</strong></div>
         <div className="ultimate-tag"><span>CINEMATIC FINISH</span><strong>{fighter.ultimate}</strong></div>
-        <div className="combo-tag"><span>{fighter.combo.name}</span><strong>{fighter.combo.sequence.join(" › ")}</strong></div>
+        <div className="combo-tag"><span>{fighter.combo.name}</span><strong>{normalizeComboSequence(fighter.combo.sequence).join(" › ")}</strong></div>
       </div>
     </article>
   );
@@ -521,9 +532,15 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
     let running = true;
     const fixed = 1 / 60;
     const particleCap = lowPower || reduceMotion ? 36 : 90;
-    const aiRate = difficulty === "ROOKIE" ? 0.56 : difficulty === "PRO" ? 0.33 : 0.19;
+    const aiRate = difficulty === "ROOKIE" ? 1.15 : difficulty === "PRO" ? 0.82 : 0.55;
     const inputHistory: Array<{ key: string; at: number }> = [];
     const directionHistory: Array<{ key: string; at: number }> = [];
+    const inputRing: Array<{ frame: number; keys: string[] }> = [];
+    const lastMoveTap: Record<string, number> = { left: -1000, right: -1000 };
+    const attackPressedAt: Record<string, number> = {};
+    let simulationFrame = 0;
+    let jumpPressedAt = 0;
+    let debugBoxes = false;
     const previousWants = new Map<Combatant, Record<string, boolean>>([[p1, {}], [p2, {}]]);
     let lastRemoteActionSeq = -1;
     let snapshotSequence = 0;
@@ -544,7 +561,7 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
     const recordAction = (key: string): Combatant["attack"] => {
       const now = performance.now(); inputHistory.push({ key, at: now });
       while (inputHistory.length > 10 || (inputHistory[0] && now - inputHistory[0].at > 1700)) inputHistory.shift();
-      const routes: ComboRoute[] = [{ name: player.combo.name, sequence: player.combo.sequence, finisher: "special", bonus: 12, drive: 28 }, ...ADVANCED_COMBOS];
+      const routes: ComboRoute[] = [{ name: player.combo.name, sequence: normalizeComboSequence(player.combo.sequence), finisher: "special", bonus: 12, drive: 28 }, ...ADVANCED_COMBOS];
       for (const route of routes) {
         const tail = inputHistory.slice(-route.sequence.length);
         if (tail.length === route.sequence.length && tail.every((item, index) => item.key === route.sequence[index]) && tail[tail.length - 1].at - tail[0].at <= 1550) {
@@ -563,6 +580,8 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       target.attack = value.attack; target.attackTime = value.attackTime; target.attackHit = value.attackHit; target.hurtTime = value.hurtTime; target.stunTime = value.stunTime;
       target.flashTime = value.flashTime; target.combo = value.combo; target.comboWindow = value.comboWindow; target.wins = value.wins;
       target.guardMeter = value.guardMeter ?? 100; target.evadeTime = value.evadeTime ?? 0;
+      target.state = value.state ?? "idle"; target.blockstunTime = value.blockstunTime ?? 0; target.knockdownTime = value.knockdownTime ?? 0;
+      target.invulnTime = value.invulnTime ?? 0; target.dashTime = value.dashTime ?? 0; target.maxModeTime = value.maxModeTime ?? 0; target.superMeter = value.superMeter ?? 100;
     };
 
     const applyRemoteSnapshot = (onlyWhenNew = false) => {
@@ -585,7 +604,7 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       return true;
     };
 
-    const combatantSnapshot = (value: Combatant): CombatantSnapshot => ({ x: value.x, y: value.y, vx: value.vx, vy: value.vy, facing: value.facing, health: value.health, drive: value.drive, grounded: value.grounded, crouching: value.crouching, guarding: value.guarding, attack: value.attack, attackTime: value.attackTime, attackHit: value.attackHit, hurtTime: value.hurtTime, stunTime: value.stunTime, flashTime: value.flashTime, combo: value.combo, comboWindow: value.comboWindow, guardMeter: value.guardMeter, evadeTime: value.evadeTime, wins: value.wins });
+    const combatantSnapshot = (value: Combatant): CombatantSnapshot => ({ x: value.x, y: value.y, vx: value.vx, vy: value.vy, facing: value.facing, health: value.health, drive: value.drive, grounded: value.grounded, crouching: value.crouching, guarding: value.guarding, attack: value.attack, attackTime: value.attackTime, attackHit: value.attackHit, hurtTime: value.hurtTime, stunTime: value.stunTime, flashTime: value.flashTime, combo: value.combo, comboWindow: value.comboWindow, guardMeter: value.guardMeter, evadeTime: value.evadeTime, state: value.state, blockstunTime: value.blockstunTime, knockdownTime: value.knockdownTime, invulnTime: value.invulnTime, dashTime: value.dashTime, maxModeTime: value.maxModeTime, superMeter: value.superMeter, wins: value.wins });
 
     const snapshot = (): MatchSnapshot => ({ sequence: ++snapshotSequence, p1: combatantSnapshot(p1), p2: combatantSnapshot(p2), timer, round, roundState, projectiles: projectiles.map((item) => ({ x: item.x, y: item.y, vx: item.vx, life: item.life, color: item.color, damage: item.damage, owner: item.owner === p1 ? 1 : 2 })) });
 
@@ -616,8 +635,8 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       return true;
     };
 
-    const hit = (attacker: Combatant, defender: Combatant, damage: number, force: number, color: string, impact = false) => {
-      if (defender.hurtTime > 0.02 || defender.evadeTime > 0.06 || roundState !== "fight") return;
+    const hit = (attacker: Combatant, defender: Combatant, damage: number, force: number, color: string, impact = false, hitstunFrames = 13, blockstunFrames = 7) => {
+      if (defender.hurtTime > 0.02 || defender.evadeTime > 0.06 || defender.invulnTime > 0 || roundState !== "fight") return;
       const blocked = defender.guarding && defender.grounded && defender.facing === -attacker.facing;
       const counter = !blocked && !!defender.attack;
       const dealt = blocked ? damage * 0.28 : damage;
@@ -625,6 +644,9 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       defender.drive = clamp(defender.drive - (blocked ? 7 : 3), 0, 100);
       defender.vx = attacker.facing * force * (blocked ? 0.35 : 1);
       defender.hurtTime = blocked ? 0.12 : impact ? 0.46 : 0.24;
+      defender.blockstunTime = blocked ? blockstunFrames / 60 : 0;
+      defender.stunTime = blocked ? 0 : Math.max(defender.stunTime, hitstunFrames / 60);
+      if (!blocked && impact) defender.knockdownTime = defender.grounded ? 0.42 : 0.7;
       defender.flashTime = 0.1;
       if (blocked) {
         defender.guardMeter = clamp(defender.guardMeter - damage * 2.6, 0, 100);
@@ -632,25 +654,50 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       }
       if (!blocked && impact) defender.stunTime = 0.35;
       attacker.drive = clamp(attacker.drive + (blocked ? 3 : 8), 0, 100);
+      attacker.superMeter = clamp(attacker.superMeter + (blocked ? 5 : impact ? 18 : 10), 0, 300);
+      defender.superMeter = clamp(defender.superMeter + (blocked ? 4 : 7), 0, 300);
       attacker.combo = attacker.comboWindow > 0 ? attacker.combo + 1 : 1;
       attacker.comboWindow = 0.8;
       shake = Math.max(shake, impact ? 13 : blocked ? 2 : 6);
-      hitStop = Math.max(hitStop, blocked ? 0.025 : impact ? 0.09 : 0.052);
+      hitStop = Math.max(hitStop, blocked ? 2 / 60 : impact ? 3 / 60 : 2 / 60);
       impactFlash = Math.max(impactFlash, impact ? 0.16 : blocked ? 0.045 : 0.09);
       combatCallout = blocked ? "GUARD" : counter ? "COUNTER HIT" : impact ? "HEAVY IMPACT" : attacker.combo > 2 ? `${attacker.combo} HIT CHAIN` : "CLEAN HIT";
       combatCalloutTime = blocked ? 0.25 : impact || counter ? 0.68 : 0.42;
       burst(defender.x, defender.y - 112, blocked ? "#e8fbff" : color, blocked ? 6 : impact ? 22 : 12);
     };
 
-    const attackData = (type: NonNullable<Combatant["attack"]>) => ({
-      lightPunch: { activeA: 0.05, activeB: 0.125, end: 0.22, range: 72, damage: 5.2, force: 145 },
-      heavyPunch: { activeA: 0.13, activeB: 0.25, end: 0.43, range: 104, damage: 10.8, force: 270 },
-      lightKick: { activeA: 0.075, activeB: 0.165, end: 0.28, range: 88, damage: 6.4, force: 180 },
-      heavyKick: { activeA: 0.16, activeB: 0.29, end: 0.49, range: 122, damage: 12.2, force: 315 },
-      special: { activeA: 0.16, activeB: 0.32, end: 0.58, range: 138, damage: 14, force: 340 },
-      impact: { activeA: 0.23, activeB: 0.39, end: 0.62, range: 126, damage: 18, force: 430 },
-      super: { activeA: 0.19, activeB: 0.48, end: 0.82, range: 178, damage: 28, force: 510 },
-    }[type]);
+    const attackData = (type: NonNullable<Combatant["attack"]>) => {
+      const frames = {
+        lightPunch: { startup: 3, active: 4, recovery: 7, range: 72, damage: 4.8, force: 145, hitstun: 11, blockstun: 6 },
+        heavyPunch: { startup: 8, active: 6, recovery: 13, range: 104, damage: 11.2, force: 275, hitstun: 18, blockstun: 10 },
+        lightKick: { startup: 3, active: 5, recovery: 9, range: 90, damage: 6.2, force: 180, hitstun: 13, blockstun: 7 },
+        heavyKick: { startup: 8, active: 7, recovery: 15, range: 126, damage: 13.2, force: 320, hitstun: 20, blockstun: 11 },
+        special: { startup: 9, active: 10, recovery: 17, range: 142, damage: 14.5, force: 345, hitstun: 22, blockstun: 13 },
+        impact: { startup: 6, active: 8, recovery: 21, range: 132, damage: 18.5, force: 440, hitstun: 26, blockstun: 15 },
+        super: { startup: 7, active: 18, recovery: 24, range: 182, damage: 29, force: 520, hitstun: 32, blockstun: 18 },
+      }[type];
+      return { ...frames, activeA: frames.startup / 60, activeB: (frames.startup + frames.active) / 60, end: (frames.startup + frames.active + frames.recovery) / 60 };
+    };
+
+    const overlaps = (a: CombatBox, b: CombatBox) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+    const combatBoxes = (c: Combatant) => {
+      const bodyHeight = c.crouching ? 118 : 184;
+      const pushbox: CombatBox = { x: c.x - 34, y: c.y - bodyHeight, width: 68, height: bodyHeight };
+      const hurtboxes: CombatBox[] = [
+        { x: c.x - 39, y: c.y - bodyHeight, width: 78, height: bodyHeight * 0.58 },
+        { x: c.x - 32, y: c.y - bodyHeight * 0.44, width: 64, height: bodyHeight * 0.44 },
+      ];
+      const hitboxes: CombatBox[] = [];
+      if (c.attack) {
+        const data = attackData(c.attack);
+        if (c.attackTime >= data.activeA && c.attackTime <= data.activeB) {
+          const height = c.attack === "lightKick" || c.attack === "heavyKick" ? 58 : 48;
+          hitboxes.push({ x: c.facing === 1 ? c.x + 22 : c.x - data.range - 22, y: c.y - (c.attack === "heavyKick" ? 130 : 152), width: data.range, height });
+        }
+      }
+      const throwbox: CombatBox = { x: c.facing === 1 ? c.x + 20 : c.x - 74, y: c.y - 145, width: 54, height: 105 };
+      return { pushbox, hurtboxes, hitboxes, throwbox };
+    };
 
     const updateCombatant = (c: Combatant, foe: Combatant, move: number, wants: Record<string, boolean>, dt: number) => {
       const previous = previousWants.get(c) ?? {};
@@ -661,16 +708,26 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       else { c.queuedTime = Math.max(0, c.queuedTime - dt); if (c.queuedTime === 0) c.queuedAttack = null; }
       c.facing = c.x < foe.x ? 1 : -1;
       c.hurtTime = Math.max(0, c.hurtTime - dt); c.stunTime = Math.max(0, c.stunTime - dt); c.flashTime = Math.max(0, c.flashTime - dt);
-      c.evadeTime = Math.max(0, c.evadeTime - dt); c.guardMeter = clamp(c.guardMeter + dt * (c.guarding ? 1.2 : 8), 0, 100);
+      c.evadeTime = Math.max(0, c.evadeTime - dt); c.blockstunTime = Math.max(0, c.blockstunTime - dt); c.knockdownTime = Math.max(0, c.knockdownTime - dt);
+      c.invulnTime = Math.max(0, c.invulnTime - dt); c.dashTime = Math.max(0, c.dashTime - dt); c.maxModeTime = Math.max(0, c.maxModeTime - dt);
+      c.guardMeter = clamp(c.guardMeter + dt * (c.guarding ? 1.2 : 8), 0, 100);
       c.comboWindow = Math.max(0, c.comboWindow - dt); if (c.comboWindow === 0) c.combo = 0;
       c.drive = clamp(c.drive + dt * (c.guarding ? 1.5 : 5.5), 0, 100);
       c.crouching = wants.crouch && c.grounded && !c.attack;
-      c.guarding = (wants.guard || move === -c.facing) && c.grounded && !c.attack && c.hurtTime <= 0 && c.evadeTime <= 0;
+      c.guarding = (wants.guard || move === -c.facing) && c.grounded && !c.attack && c.hurtTime <= 0 && c.evadeTime <= 0 && c.knockdownTime <= 0;
+      if ((pressed.dashLeft || pressed.dashRight) && c.grounded && !c.attack && c.hurtTime <= 0 && c.stunTime <= 0) {
+        const dashDirection = pressed.dashLeft ? -1 : 1;
+        const backdash = dashDirection === -c.facing;
+        c.dashTime = backdash ? 0.2 : 0.24; c.invulnTime = backdash ? 8 / 60 : 0; c.vx = dashDirection * (backdash ? 570 : 690); c.guarding = false;
+      }
       if (pressed.evade && c.grounded && !c.attack && c.hurtTime <= 0 && c.stunTime <= 0 && c.drive >= 10) { c.evadeTime = 0.36; c.drive -= 10; c.vx = c.facing * 520; c.guarding = false; burst(c.x, c.y - 55, c.fighter.color, 8); }
-      if (c.hurtTime <= 0 && c.stunTime <= 0 && c.evadeTime <= 0 && !c.attack && roundState === "fight") {
+      if (c.hurtTime <= 0 && c.stunTime <= 0 && c.blockstunTime <= 0 && c.knockdownTime <= 0 && c.evadeTime <= 0 && !c.attack && roundState === "fight") {
         const speed = (190 + c.fighter.speed * 16) * (c.crouching || c.guarding ? 0.22 : 1);
-        c.vx = lerp(c.vx, move * speed, 0.26);
-        if (pressed.jump && c.grounded && !c.crouching && !c.guarding) { c.vy = -(550 + c.fighter.speed * 7); c.grounded = false; }
+        if (c.dashTime <= 0) c.vx = lerp(c.vx, move * speed, 0.26);
+        if (pressed.jump && c.grounded && !c.guarding) {
+          const superJump = c === p1 && inputRing.slice(-8).some((frame) => frame.keys.includes("crouch"));
+          c.vy = -(superJump ? 710 : 550 + c.fighter.speed * 7); if (superJump && move) c.vx = move * 560; c.grounded = false; c.crouching = false;
+        }
         if (c.queuedAttack && startAttack(c, c.queuedAttack)) { c.queuedAttack = null; c.queuedTime = 0; }
       } else if (c.hurtTime > 0 || c.stunTime > 0) c.guarding = false;
 
@@ -678,19 +735,22 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
         c.attackTime += dt;
         const data = attackData(c.attack);
         const isProjectileSpecial = c.attack === "special" || c.attack === "super";
-        if (!c.attackHit && !isProjectileSpecial && c.attackTime >= data.activeA && c.attackTime <= data.activeB && Math.abs(c.x - foe.x) < data.range + c.fighter.reach * 2 && Math.abs(c.y - foe.y) < 105) {
-          c.attackHit = true; hit(c, foe, data.damage + c.fighter.power * 0.42 + (c === p1 && c.attack === comboAttack ? comboBonus : 0), data.force, c.fighter.color, c.attack === "impact" || c.attack === "super");
+        const boxes = combatBoxes(c), foeBoxes = combatBoxes(foe);
+        if (!c.attackHit && !isProjectileSpecial && boxes.hitboxes.some((hitbox) => foeBoxes.hurtboxes.some((hurtbox) => overlaps(hitbox, hurtbox)))) {
+          c.attackHit = true; hit(c, foe, data.damage + c.fighter.power * 0.42 + (c === p1 && c.attack === comboAttack ? comboBonus : 0), data.force, c.fighter.color, c.attack === "impact" || c.attack === "super", data.hitstun, data.blockstun);
         }
         if ((c.attack === "special" || c.attack === "super") && !isProjectileSpecial && c.attackTime < 0.42) c.vx += c.facing * (c.attack === "super" ? 52 : 28);
         const next = c.queuedAttack;
         const rank = { lightPunch: 1, lightKick: 1, heavyPunch: 2, heavyKick: 2, impact: 3, special: 4, super: 5 };
-        if (next && c.attackHit && c.comboWindow > 0 && rank[next] > rank[c.attack] && startAttack(c, next, true)) { c.queuedAttack = null; c.queuedTime = 0; }
+        const maxCancel = c.maxModeTime > 0 && rank[next ?? "lightPunch"] >= 2;
+        if (next && c.attackHit && c.comboWindow > 0 && (rank[next] > rank[c.attack] || maxCancel) && startAttack(c, next, true)) { c.queuedAttack = null; c.queuedTime = 0; }
         else if (c.attackTime >= data.end) { if (c === p1 && c.attack === comboAttack) { comboBonus = 0; comboAttack = null; } c.attack = null; c.attackTime = 0; }
       }
 
       c.vy += 1450 * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.vx *= c.grounded ? 0.82 : 0.985;
       if (c.y >= FLOOR) { c.y = FLOOR; c.vy = 0; c.grounded = true; } else c.grounded = false;
       c.x = clamp(c.x, 82, W - 82);
+      c.state = c.knockdownTime > 0 ? "hardKnockdown" : c.blockstunTime > 0 ? "blockstun" : c.stunTime > 0 ? (c.grounded ? "hitstun" : "juggle") : c.attack ? "attacking" : c.dashTime > 0 ? "dashing" : c.guarding ? "blocking" : !c.grounded ? "jumping" : c.crouching ? "crouching" : Math.abs(c.vx) > 28 ? "walking" : c.maxModeTime > 0 ? "maxMode" : "idle";
       previousWants.set(c, { ...wants });
     };
 
@@ -698,12 +758,12 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       aiTimer -= dt;
       const distance = Math.abs(p1.x - p2.x);
       if (aiTimer <= 0) {
-        aiTimer = aiRate * (0.72 + Math.random() * 0.75);
+        aiTimer = aiRate * (0.9 + Math.random() * 0.85);
         const r = Math.random();
-        if (p2.health < 28 && r < 0.26) aiIntent = "guard";
-        else if (distance > 300) aiIntent = p2.fighter.style === "Zoner" && p2.drive >= 25 && r < 0.52 ? "special" : "approach";
-        else if (distance < 95) aiIntent = r < 0.18 ? "retreat" : r < 0.34 ? "guard" : r < 0.54 ? "lightPunch" : r < 0.72 ? "lightKick" : r < 0.88 ? "heavyKick" : p2.drive >= 32 ? "impact" : "jump";
-        else aiIntent = r < 0.24 ? "approach" : r < 0.43 ? "jump" : r < 0.62 ? "heavyPunch" : r < 0.78 ? "heavyKick" : p2.drive >= 25 ? "special" : "lightPunch";
+        if (p2.health < 28 && r < 0.42) aiIntent = "guard";
+        else if (distance > 330) aiIntent = r < 0.38 ? "idle" : r < 0.72 ? "approach" : p2.fighter.style === "Zoner" && p2.drive >= 25 ? "special" : "idle";
+        else if (distance < 105) aiIntent = r < 0.24 ? "idle" : r < 0.46 ? "retreat" : r < 0.62 ? "guard" : r < 0.76 ? "lightPunch" : r < 0.88 ? "lightKick" : "heavyKick";
+        else aiIntent = r < 0.32 ? "idle" : r < 0.52 ? "approach" : r < 0.68 ? "guard" : r < 0.79 ? "jump" : r < 0.9 ? "heavyPunch" : p2.drive >= 25 ? "special" : "lightKick";
       }
       return { move: aiIntent === "approach" ? p2.facing : aiIntent === "retreat" ? -p2.facing : 0, jump: aiIntent === "jump", crouch: false, guard: aiIntent === "guard", evade: false, lightPunch: aiIntent === "lightPunch", heavyPunch: aiIntent === "heavyPunch", lightKick: aiIntent === "lightKick", heavyKick: aiIntent === "heavyKick", special: aiIntent === "special", impact: aiIntent === "impact", super: false };
     };
@@ -711,18 +771,21 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
     const resetRound = () => {
       p1.x = 350; p1.y = FLOOR; p1.vx = p1.vy = 0; p1.health = 100; p1.drive = 65; p1.guardMeter = 100; p1.evadeTime = 0; p1.attack = null; p1.queuedAttack = null; p1.queuedTime = 0; p1.hurtTime = p1.stunTime = 0;
       p2.x = 930; p2.y = FLOOR; p2.vx = p2.vy = 0; p2.health = 100; p2.drive = 65; p2.guardMeter = 100; p2.evadeTime = 0; p2.attack = null; p2.queuedAttack = null; p2.queuedTime = 0; p2.hurtTime = p2.stunTime = 0;
+      for (const combatant of [p1, p2]) { combatant.state = "idle"; combatant.blockstunTime = 0; combatant.knockdownTime = 0; combatant.invulnTime = 0; combatant.dashTime = 0; combatant.maxModeTime = 0; }
       projectiles.length = 0; particles.length = 0; timer = 75; roundState = "intro"; stateTimer = 1.15;
     };
 
     const update = (dt: number) => {
       impactFlash = Math.max(0, impactFlash - dt); combatCalloutTime = Math.max(0, combatCalloutTime - dt);
+      inputRing.push({ frame: ++simulationFrame, keys: Object.entries(inputs).filter(([, value]) => value === true).map(([key]) => key) });
+      if (inputRing.length > 30) inputRing.shift();
       if (hitStop > 0) { hitStop = Math.max(0, hitStop - dt); return; }
       if (mode === "ONLINE" && role !== "host") {
         if (role === "spectator") { applyRemoteSnapshot(); return; }
         // Player 2 immediately simulates their own controls between authoritative
         // host snapshots. Each new snapshot reconciles the prediction.
         applyRemoteSnapshot(true);
-        const predicted = { jump: !!inputs.jump, crouch: !!inputs.crouch, guard: !!inputs.guard, evade: !!inputs.evade, lightPunch: !!inputs.lightPunch, heavyPunch: !!inputs.heavyPunch, lightKick: !!inputs.lightKick, heavyKick: !!inputs.heavyKick, special: !!inputs.special, impact: !!inputs.impact, super: !!inputs.super };
+        const predicted = { jump: !!inputs.jump, crouch: !!inputs.crouch, guard: !!inputs.guard, evade: !!inputs.evade, dashLeft: !!inputs.dashLeft, dashRight: !!inputs.dashRight, lightPunch: !!inputs.lightPunch, heavyPunch: !!inputs.heavyPunch, lightKick: !!inputs.lightKick, heavyKick: !!inputs.heavyKick, special: !!inputs.special, impact: !!inputs.impact, super: !!inputs.super };
         const predictedMove = (inputs.left ? -1 : 0) + (inputs.right ? 1 : 0);
         updateCombatant(p2, p1, predictedMove, predicted, dt);
         p1.x = clamp(p1.x + p1.vx * dt, 82, W - 82);
@@ -740,11 +803,11 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       }
 
       comboCallout = Math.max(0, comboCallout - dt); finisherTime = Math.max(0, finisherTime - dt);
-      const local = { jump: !!inputs.jump, crouch: !!inputs.crouch, guard: !!inputs.guard, evade: !!inputs.evade, lightPunch: !!inputs.lightPunch, heavyPunch: !!inputs.heavyPunch, lightKick: !!inputs.lightKick, heavyKick: !!inputs.heavyKick, special: !!inputs.special, impact: !!inputs.impact, super: !!inputs.super };
+      const local = { jump: !!inputs.jump, crouch: !!inputs.crouch, guard: !!inputs.guard, evade: !!inputs.evade, dashLeft: !!inputs.dashLeft, dashRight: !!inputs.dashRight, lightPunch: !!inputs.lightPunch, heavyPunch: !!inputs.heavyPunch, lightKick: !!inputs.lightKick, heavyKick: !!inputs.heavyKick, special: !!inputs.special, impact: !!inputs.impact, super: !!inputs.super };
       const localMove = (inputs.left ? -1 : 0) + (inputs.right ? 1 : 0);
       const remote = remoteInputRef.current ?? {};
       const remoteMove = (remote.left ? -1 : 0) + (remote.right ? 1 : 0);
-      const remoteWants: Record<string, boolean> = { jump: !!remote.jump, crouch: !!remote.crouch, guard: !!remote.guard, evade: !!remote.evade, lightPunch: false, heavyPunch: false, lightKick: false, heavyKick: false, special: false, impact: false, super: false };
+      const remoteWants: Record<string, boolean> = { jump: !!remote.jump, crouch: !!remote.crouch, guard: !!remote.guard, evade: !!remote.evade, dashLeft: !!remote.dashLeft, dashRight: !!remote.dashRight, lightPunch: false, heavyPunch: false, lightKick: false, heavyKick: false, special: false, impact: false, super: false };
       const remoteSeq = Number(remote.actionSeq ?? -1);
       const remoteAction = String(remote.action ?? "");
       if (remoteSeq !== lastRemoteActionSeq && ["lightPunch", "heavyPunch", "lightKick", "heavyKick", "special", "impact", "super"].includes(remoteAction)) {
@@ -756,8 +819,8 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       updateCombatant(p1, p2, localMove, local, dt);
       updateCombatant(p2, p1, mode === "CPU" ? aiMove : remoteMove, mode === "CPU" ? aiWants : remoteWants, dt);
 
-      const gap = Math.abs(p1.x - p2.x);
-      if (gap < 86 && Math.abs(p1.y - p2.y) < 110) { const push = (86 - gap) * 0.5; p1.x -= p1.facing * push; p2.x -= p2.facing * push; }
+      const p1Push = combatBoxes(p1).pushbox, p2Push = combatBoxes(p2).pushbox;
+      if (overlaps(p1Push, p2Push)) { const overlapWidth = Math.min(p1Push.x + p1Push.width, p2Push.x + p2Push.width) - Math.max(p1Push.x, p2Push.x); p1.x -= p1.facing * overlapWidth * .5; p2.x -= p2.facing * overlapWidth * .5; }
 
       for (let i = projectiles.length - 1; i >= 0; i--) {
         const q = projectiles[i]; q.x += q.vx * dt; q.life -= dt;
@@ -782,6 +845,7 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       const bob = c.grounded ? Math.sin(now * 0.004) * 2 : 0;
       ctx.save(); ctx.translate(c.x + c.facing * reach, c.y + bob); ctx.scale(c.facing, 1);
       ctx.fillStyle = "rgba(0,0,0,.42)"; ctx.beginPath(); ctx.ellipse(0, 2, c.fighter.kind === "monster" ? 78 : 58, 11, 0, 0, Math.PI * 2); ctx.fill();
+      if (c.maxModeTime > 0) { ctx.globalAlpha = .3 + Math.sin(now * .025) * .12; ctx.strokeStyle = c.fighter.color; ctx.shadowBlur = 28; ctx.shadowColor = c.fighter.color; ctx.lineWidth = 13; ctx.beginPath(); ctx.ellipse(0, -142, 92, 172, 0, 0, Math.PI * 2); ctx.stroke(); ctx.shadowBlur = 0; ctx.globalAlpha = 1; }
       if (c.guarding) { ctx.globalAlpha = 0.42; ctx.strokeStyle = c.fighter.color; ctx.lineWidth = 10; ctx.beginPath(); ctx.arc(6, -125, 88, -1.25, 1.25); ctx.stroke(); ctx.globalAlpha = 1; }
       if (c.evadeTime > 0) ctx.globalAlpha = 0.42;
       if (c.flashTime > 0) ctx.globalCompositeOperation = "screen";
@@ -839,6 +903,11 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       if (c.combo > 1) { ctx.fillStyle = c.fighter.color; ctx.font = "900 22px Arial"; ctx.textAlign = "center"; ctx.fillText(`${c.combo} HIT`, c.x, c.y - 330); }
     };
 
+    const drawDebugBox = (box: CombatBox, color: string) => { ctx.globalAlpha = .24; ctx.fillStyle = color; ctx.fillRect(box.x, box.y, box.width, box.height); ctx.globalAlpha = .9; ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.strokeRect(box.x, box.y, box.width, box.height); ctx.globalAlpha = 1; };
+    const drawCombatBoxes = (c: Combatant) => {
+      const boxes = combatBoxes(c); drawDebugBox(boxes.pushbox, "#ffe14a"); boxes.hurtboxes.forEach((box) => drawDebugBox(box, "#42dfff")); boxes.hitboxes.forEach((box) => drawDebugBox(box, "#ff405c")); drawDebugBox(boxes.throwbox, "#c86cff");
+    };
+
     const drawHud = () => {
       const drawBar = (x: number, y: number, width: number, value: number, color: string, flip = false) => {
         ctx.fillStyle = "rgba(3,6,16,.82)"; ctx.fillRect(x, y, width, 24);
@@ -849,6 +918,8 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       drawBar(50, 62, 455, p1.health, p1.fighter.color); drawBar(W - 505, 62, 455, p2.health, p2.fighter.color, true);
       ctx.fillStyle = "#172039"; ctx.fillRect(50, 94, 360, 9); ctx.fillRect(W - 410, 94, 360, 9); ctx.fillStyle = p1.fighter.color; ctx.fillRect(50, 94, 360 * p1.drive / 100, 9); ctx.fillStyle = p2.fighter.color; ctx.fillRect(W - 50 - 360 * p2.drive / 100, 94, 360 * p2.drive / 100, 9);
       ctx.fillStyle = "#1c2336"; ctx.fillRect(50, 108, 250, 4); ctx.fillRect(W - 300, 108, 250, 4); ctx.fillStyle = p1.guardMeter < 35 ? "#ff405c" : "#f1f5ff"; ctx.fillRect(50, 108, 250 * p1.guardMeter / 100, 4); ctx.fillStyle = p2.guardMeter < 35 ? "#ff405c" : "#f1f5ff"; ctx.fillRect(W - 50 - 250 * p2.guardMeter / 100, 108, 250 * p2.guardMeter / 100, 4);
+      for (let bar = 0; bar < 3; bar++) { const leftFill = clamp(p1.superMeter - bar * 100, 0, 100) / 100, rightFill = clamp(p2.superMeter - bar * 100, 0, 100) / 100; ctx.fillStyle = "#202844"; ctx.fillRect(50 + bar * 88, 119, 80, 6); ctx.fillRect(W - 130 - bar * 88, 119, 80, 6); ctx.fillStyle = p1.fighter.color; ctx.fillRect(50 + bar * 88, 119, 80 * leftFill, 6); ctx.fillStyle = p2.fighter.color; ctx.fillRect(W - 50 - bar * 88 - 80 * rightFill, 119, 80 * rightFill, 6); }
+      ctx.font = "800 10px Arial"; ctx.fillStyle = "#9ba9c5"; ctx.textAlign = "left"; ctx.fillText(p1.state.toUpperCase(), 50, 142); ctx.textAlign = "right"; ctx.fillText(p2.state.toUpperCase(), W - 50, 142);
       ctx.fillStyle = "#f5fbff"; ctx.textAlign = "center"; ctx.font = "900 38px Arial"; ctx.fillText(String(Math.ceil(timer)).padStart(2, "0"), W / 2, 75); ctx.font = "700 12px Arial"; ctx.fillStyle = "#9ba9c5"; ctx.fillText(`ROUND ${round}`, W / 2, 96);
       for (let i = 0; i < 2; i++) { ctx.fillStyle = i < p1.wins ? p1.fighter.color : "#26304a"; ctx.beginPath(); ctx.arc(444 + i * 20, 118, 6, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = i < p2.wins ? p2.fighter.color : "#26304a"; ctx.beginPath(); ctx.arc(W - 444 - i * 20, 118, 6, 0, Math.PI * 2); ctx.fill(); }
     };
@@ -857,6 +928,8 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       ctx.save();
       const sx = shake > 0.5 ? (Math.random() - 0.5) * shake : 0, sy = shake > 0.5 ? (Math.random() - 0.5) * shake * 0.5 : 0;
       ctx.translate(sx, sy); ctx.drawImage(background, 0, 0);
+      if (!reduceMotion && stage.id === "shibuya") { ctx.strokeStyle = "rgba(125,225,255,.22)"; ctx.lineWidth = 2; for (let i = 0; i < 38; i++) { const x = (i * 91 + performance.now() * .22) % W, y = (i * 67 + performance.now() * .48) % H; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 11, y + 27); ctx.stroke(); } }
+      if (!reduceMotion && stage.id === "steppe") { ctx.fillStyle = "rgba(239,252,255,.72)"; for (let i = 0; i < 42; i++) { const x = (i * 83 + performance.now() * .035 * (1 + i % 3)) % W, y = (i * 59 + performance.now() * .075) % H; ctx.beginPath(); ctx.arc(x, y, 1.5 + i % 3, 0, Math.PI * 2); ctx.fill(); } }
       ctx.save(); ctx.globalCompositeOperation = "lighter";
       for (const q of projectiles) {
         const direction = Math.sign(q.vx) || 1, pulse = 1 + Math.sin(performance.now() * .028 + q.x * .02) * .16;
@@ -868,7 +941,7 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
         ctx.strokeStyle = "#eaffff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(q.x - direction * 72, q.y + 5); ctx.lineTo(q.x - direction * 45, q.y - 10); ctx.lineTo(q.x - direction * 18, q.y + 7); ctx.lineTo(q.x + direction * 13, q.y - 3); ctx.stroke();
       }
       ctx.restore();
-      drawCombatant(p1); drawCombatant(p2);
+      drawCombatant(p1); drawCombatant(p2); if (debugBoxes) { drawCombatBoxes(p1); drawCombatBoxes(p2); }
       ctx.save(); ctx.globalCompositeOperation = "lighter";
       for (const q of particles) { const alpha = clamp(q.life / q.maxLife, 0, 1); ctx.globalAlpha = alpha; ctx.shadowBlur = 12; ctx.shadowColor = q.color; ctx.strokeStyle = q.color; ctx.lineWidth = Math.max(1.5, q.size * .55); ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x - q.vx * .035, q.y - q.vy * .035); ctx.stroke(); }
       ctx.restore(); ctx.globalAlpha = 1; ctx.shadowBlur = 0;
@@ -910,8 +983,8 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
     };
 
     const keyMap: Record<string, string> = { KeyA: "left", KeyD: "right", KeyW: "jump", KeyS: "crouch", KeyE: "evade", Space: "guard" };
-    const attackKeyMap: Record<string, NonNullable<Combatant["attack"]>> = { KeyY: "lightPunch", KeyU: "heavyPunch", KeyI: "lightKick", KeyL: "heavyKick", KeyO: "special", KeyP: "super" };
-    const comboKeyMap: Record<string, string> = { KeyY: "Y", KeyU: "U", KeyI: "I", KeyL: "L" };
+    const attackKeyMap: Record<string, NonNullable<Combatant["attack"]>> = { KeyU: "lightPunch", KeyI: "heavyPunch", KeyO: "lightKick", Semicolon: "heavyKick", KeyY: "lightPunch", KeyL: "heavyKick", KeyP: "super" };
+    const comboKeyMap: Record<string, string> = { KeyU: "U", KeyI: "I", KeyO: "O", Semicolon: ";", KeyY: "U", KeyL: ";" };
     const direction = () => inputs.crouch ? inputs.left ? "DFL" : inputs.right ? "DFR" : "D" : inputs.left ? "L" : inputs.right ? "R" : "N";
     const recordDirection = () => {
       const now = performance.now(), key = direction();
@@ -923,16 +996,26 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       return tail.length === sequence.length && tail.every((item, index) => item.key === sequence[index]) && tail.at(-1)!.at - tail[0].at <= 850;
     };
     const resolveCommand = (base: NonNullable<Combatant["attack"]>) => {
-      const qcfRight = hasMotion(["D", "DFR", "R"]), qcfLeft = hasMotion(["D", "DFL", "L"]);
-      const superRight = hasMotion(["D", "DFR", "R", "D", "DFR", "R"]), superLeft = hasMotion(["D", "DFL", "L", "D", "DFL", "L"]);
-      const dp = hasMotion(["R", "D", "DFR"]) || hasMotion(["L", "D", "DFL"]);
-      if ((base === "heavyPunch" || base === "heavyKick") && (superRight || superLeft)) return "super" as const;
-      if ((base === "lightPunch" || base === "heavyPunch") && dp) return "impact" as const;
-      if (["lightPunch", "heavyPunch", "lightKick", "heavyKick"].includes(base) && (qcfRight || qcfLeft)) return "special" as const;
-      if ((base === "heavyPunch" && !!inputs.heavyKick) || (base === "heavyKick" && !!inputs.heavyPunch)) return "impact" as const;
+      const forward = p1.facing === 1 ? "R" : "L", diagonal = p1.facing === 1 ? "DFR" : "DFL";
+      const qcf = hasMotion(["D", forward]) || hasMotion(["D", diagonal]) || hasMotion(["D", diagonal, forward]);
+      const superMotion = hasMotion(["D", forward, "D", forward]) || hasMotion(["D", diagonal, forward, "D", diagonal, forward]);
+      const dp = hasMotion([forward, "D", forward]) || hasMotion([forward, "D", diagonal]);
+      const exPunch = (base === "heavyPunch" && !!inputs.lightPunch) || (base === "lightPunch" && !!inputs.heavyPunch);
+      if (exPunch && (qcf || p1.maxModeTime > 0) && (p1.superMeter >= 50 || p1.maxModeTime > 0)) {
+        if (p1.maxModeTime <= 0) p1.superMeter -= 50; combatCallout = "EX SPECIAL"; combatCalloutTime = .7; return "special" as const;
+      }
+      if ((base === "heavyPunch" || base === "heavyKick") && superMotion) return "super" as const;
+      if (base === "heavyPunch" && dp) return "impact" as const;
+      if (["lightPunch", "heavyPunch", "lightKick", "heavyKick"].includes(base) && qcf) return "special" as const;
+      if (base === "heavyKick" && (!!inputs.heavyPunch || !!inputs.right || !!inputs.left)) return "impact" as const;
       return base;
     };
+    const activateMaxMode = () => {
+      if (p1.superMeter < 100 || p1.maxModeTime > 0) return false;
+      p1.superMeter -= 100; p1.maxModeTime = 10; activeComboName = "MAX MODE"; comboCallout = 1.2; combatCallout = "HEAVY CANCELS ENABLED"; combatCalloutTime = 1.2; burst(p1.x, p1.y - 120, p1.fighter.color, 36); return true;
+    };
     const pulseAction = (initialAction: NonNullable<Combatant["attack"]>, comboKey?: string) => {
+      if (((initialAction === "lightKick" && !!inputs.heavyKick) || (initialAction === "heavyKick" && !!inputs.lightKick)) && activateMaxMode()) return;
       const comboAction = comboKey ? recordAction(comboKey) : null;
       const action = comboAction ?? initialAction;
       inputs[action] = true;
@@ -945,13 +1028,27 @@ function GameCanvas({ player, cpu, stage, outfit, difficulty, mode, role, remote
       if (role === "spectator") return;
       const control = keyMap[event.code];
       const attack = attackKeyMap[event.code];
+      if (event.code === "KeyB" && down && !event.repeat) { debugBoxes = !debugBoxes; combatCallout = debugBoxes ? "4-BOX DEBUG ON" : "4-BOX DEBUG OFF"; combatCalloutTime = .7; return; }
       if (!control && !attack) return;
       event.preventDefault();
       if (control) {
         inputs[control] = down;
+        if (down && (control === "left" || control === "right")) {
+          const now = performance.now();
+          if (now - lastMoveTap[control] <= 260) {
+            const dashKey = control === "left" ? "dashLeft" : "dashRight"; inputs[dashKey] = true; window.setTimeout(() => { inputs[dashKey] = false; sendInput({ ...inputs }); }, 70);
+          }
+          lastMoveTap[control] = now;
+        }
+        if (control === "jump") { if (down) jumpPressedAt = performance.now(); else if (performance.now() - jumpPressedAt <= 70 && p1.vy < 0) p1.vy *= .56; }
         if (["left", "right", "crouch"].includes(control)) recordDirection();
         sendInput({ ...inputs });
-      } else if (down && !event.repeat && attack) pulseAction(resolveCommand(attack), comboKeyMap[event.code]);
+      } else if (down && !event.repeat && attack) {
+        attackPressedAt[event.code] = performance.now(); pulseAction(resolveCommand(attack), comboKeyMap[event.code]);
+      } else if (!down && attack) {
+        const released = resolveCommand(attack);
+        if (released !== attack && performance.now() - (attackPressedAt[event.code] ?? 0) > 45) pulseAction(released, comboKeyMap[event.code]);
+      }
     };
     const keyDown = (e: KeyboardEvent) => onKey(e, true), keyUp = (e: KeyboardEvent) => onKey(e, false);
     window.addEventListener("keydown", keyDown, { passive: false }); window.addEventListener("keyup", keyUp, { passive: false });
@@ -990,7 +1087,19 @@ function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, sta
   const sky = ctx.createLinearGradient(0, 0, 0, h); sky.addColorStop(0, "#050712"); sky.addColorStop(0.55, "#111a34"); sky.addColorStop(1, "#070912"); ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
   const glow = ctx.createRadialGradient(w / 2, 265, 20, w / 2, 265, 520); glow.addColorStop(0, `${stage.color}35`); glow.addColorStop(1, "transparent"); ctx.fillStyle = glow; ctx.fillRect(0, 0, w, h);
 
-  if (stage.motif === "skyline" || stage.motif === "harbour") {
+  if (stage.id === "stormmarket") {
+    ctx.fillStyle = "#3b2518"; ctx.fillRect(0, 210, w, 170); ctx.strokeStyle = "#d69b57"; ctx.lineWidth = 12;
+    for (let x = 55; x < w; x += 170) { ctx.beginPath(); ctx.moveTo(x, 160); ctx.lineTo(x, 380); ctx.stroke(); ctx.fillStyle = "#22140d"; ctx.fillRect(x + 35, 255, 62, 125); ctx.strokeStyle = stage.color; ctx.lineWidth = 4; ctx.strokeRect(x + 35, 255, 62, 125); }
+    ctx.globalAlpha = .22; ctx.fillStyle = "#fff2cf"; for (let i = 0; i < 7; i++) { ctx.beginPath(); ctx.arc(160 + i * 155, 230 - (i % 2) * 38, 26 + i * 3, 0, Math.PI * 2); ctx.fill(); } ctx.globalAlpha = 1;
+  } else if (stage.id === "solarplaza") {
+    ctx.fillStyle = "#3b2d24"; ctx.fillRect(0, 245, w, 145); ctx.fillStyle = "#b79873";
+    for (let x = 30; x < w; x += 155) { ctx.fillRect(x, 165, 38, 220); ctx.fillRect(x - 10, 155, 58, 18); ctx.strokeStyle = "#e9cfa5"; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(x + 88, 300, 55, Math.PI, 0); ctx.stroke(); }
+  } else if (stage.id === "prismmetro") {
+    ctx.fillStyle = "#121f36"; ctx.fillRect(0, 170, w, 220); for (let x = 75; x < w; x += 190) { const tube = ctx.createLinearGradient(x, 0, x + 85, 0); tube.addColorStop(0, "#263b61"); tube.addColorStop(.5, `${stage.color}77`); tube.addColorStop(1, "#263b61"); ctx.fillStyle = tube; ctx.fillRect(x, 205, 86, 170); ctx.strokeStyle = stage.accent; ctx.lineWidth = 3; ctx.strokeRect(x, 205, 86, 170); }
+  } else if (stage.id === "tidal") {
+    ctx.fillStyle = "#261018"; ctx.beginPath(); ctx.moveTo(0, 170); for (let x = 0; x <= w; x += 90) ctx.lineTo(x, 145 + (x % 180 ? 100 : 20)); ctx.lineTo(w, 390); ctx.lineTo(0, 390); ctx.fill();
+    const lava = ctx.createLinearGradient(0, 340, 0, 420); lava.addColorStop(0, "#ffdc4a"); lava.addColorStop(.45, "#ff5a23"); lava.addColorStop(1, "#4d1118"); ctx.fillStyle = lava; ctx.fillRect(0, 342, w, 48); ctx.fillStyle = "#fff3a0"; ctx.globalAlpha = .55; for (let x = 40; x < w; x += 135) ctx.fillRect(x, 352 + (x % 3) * 5, 75, 5); ctx.globalAlpha = 1;
+  } else if (stage.motif === "skyline" || stage.motif === "harbour") {
     for (let x = 0; x < w; x += 52) { const bh = 80 + ((x * 17) % 150); ctx.fillStyle = x % 104 === 0 ? "#172849" : "#101a33"; ctx.fillRect(x, 350 - bh, 42, bh); ctx.fillStyle = stage.accent; ctx.globalAlpha = 0.25; for (let y = 280; y < 345; y += 18) ctx.fillRect(x + 9, y, 7, 4); ctx.globalAlpha = 1; }
     if (stage.motif === "harbour") { ctx.strokeStyle = stage.color; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(930, 340, 150, Math.PI, 0); ctx.stroke(); }
   } else if (stage.motif === "rail" || stage.motif === "metro") {
