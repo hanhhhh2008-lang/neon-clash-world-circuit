@@ -24,6 +24,8 @@ namespace NeonClash
         private readonly Transform rig;
         private readonly SpriteRenderer shadow;
         private readonly SpriteRenderer paintedFighter;
+        private readonly PaintedFighterVolume paintedVolume;
+        private readonly FighterMeshRigPresentation meshRig;
         private readonly FighterDefinition definition;
         private readonly Color primary;
         private readonly Color secondary;
@@ -131,7 +133,10 @@ namespace NeonClash
             attackArc.SetVisible(false);
             HideCutoutArtwork();
             paintedFighter = PaintedFighterAtlas.Create(fighter.FighterId, rig, orderOffset + 34, paintedTint);
+            paintedVolume = paintedFighter != null ? paintedFighter.GetComponent<PaintedFighterVolume>() : null;
+            meshRig = FighterMeshRigPresentation.Create(root, fighter, primary, secondary, fabric, skin);
             ApplyNeutralPose();
+            if (paintedVolume != null) paintedVolume.SetTint(new Color(paintedTint.r, paintedTint.g, paintedTint.b, 0.045f));
         }
 
         public static FighterPresentation Create(FighterDefinition fighter, CostumeDefinition costume, string name, int orderOffset)
@@ -158,6 +163,7 @@ namespace NeonClash
             ApplyNeutralPose();
             ApplyStatePose(state, simulationTick, winner);
             ApplyFlash(state.HurtTicks > 0 && (simulationTick & 1) == 0);
+            meshRig.Present(state, simulationTick, CurrentState);
             return CurrentState;
         }
 
@@ -365,13 +371,25 @@ namespace NeonClash
             rearUpperArm.SetColor(flash ? Color.white : fabric);
             frontForearm.SetColor(flash ? Color.white : primary);
             rearForearm.SetColor(flash ? Color.white : primary);
-            if (paintedFighter != null) paintedFighter.color = flash ? Color.white : paintedTint;
+            if (paintedVolume != null)
+            {
+                Color tint = flash ? Color.white : paintedTint;
+                tint.a = flash ? 0.15f : 0.045f;
+                paintedVolume.SetTint(tint);
+            }
+            else if (paintedFighter != null) paintedFighter.color = flash ? Color.white : paintedTint;
+            meshRig.SetFlash(flash);
         }
 
         private void HideCutoutArtwork()
         {
             SpriteRenderer[] renderers = rig.GetComponentsInChildren<SpriteRenderer>(true);
-            for (int i = 0; i < renderers.Length; i++) renderers[i].enabled = false;
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                Transform item = renderers[i].transform;
+                if (item.IsChildOf(energyCore.Pivot) || item.IsChildOf(attackArc.Pivot)) continue;
+                renderers[i].enabled = false;
+            }
         }
 
         private void ApplyPaintedPose(int tick, float strike)

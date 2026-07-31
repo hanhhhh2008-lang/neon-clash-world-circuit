@@ -10,12 +10,12 @@ The reference board at `ArtSource/Concepts/neon-clash-roster-direction-v1.png` e
 
 1. `ContentMigrationGenerator` owns the complete first-party content map. Every fighter has body-build, hair, garment, and energy-motif fields in addition to the migrated gameplay identity.
 2. `PaintedFighterAtlas` crops ten original filled, cel-shaded full-body fighters from one transparent source-controlled atlas. The generated chroma source is retained under `ArtSource/Fighters` for provenance.
-3. `FighterPresentation` keeps its jointed cutout rig hidden as deterministic pose scaffolding and a no-asset fallback. The painted silhouette is the visible body; state transforms, hit flash, energy and attack effects remain driven by fixed simulation ticks.
+3. `FighterPresentation` keeps its jointed cutout rig hidden as deterministic pose scaffolding and a no-asset fallback. The painted silhouette is the visible body, with a five-slice extrusion, rim light, and grounded shadow volume; state transforms, hit flash, energy and attack effects remain driven by fixed simulation ticks.
 4. The three costumes are presentation-only variants:
    - **Circuit** — bright tournament kit with off-white technical panels.
    - **After Dark** — low-value, reduced-saturation stealth fabric.
    - **Heatwave** — brighter high-saturation palette with a waist flash and shortened long layers.
-5. `ArenaBackdrop` supplies the original painted neon rooftop continuously, including behind the selection UI. `StagePresentation` adds each migrated arena motif as animated foreground/parallax detail.
+5. `ArenaBackdrop` supplies the original painted neon rooftop continuously, including behind the selection UI. `StagePresentation` adds each migrated arena motif as low-alpha animated foreground/parallax detail so the real rooftop remains readable instead of being covered by opaque frames.
 
 ## Deterministic animation contract
 

@@ -206,6 +206,15 @@ namespace NeonClash
 
         private static SpriteRenderer Flat(string name, Transform parent, NeonShape shape, Color color, int order, Vector3 position, Vector2 size)
         {
+            // The painted rooftop is the readable environment layer. Motif geometry is
+            // deliberately subordinate: older builds rendered these panels opaque and
+            // turned every stage into a wall of frames over the actual background.
+            // Keep the painted environment readable.  Deep motif panels used to
+            // produce a wall of rectangular frame-shades over the fighters; those
+            // panels remain in the authored stage graph for deterministic counts but
+            // are intentionally invisible in the production presentation.
+            if (order <= -5) color.a = 0f;
+            else if (order < 0) color.a *= 0.52f;
             return NeonArtFactory.CreateFlat(name, parent, shape, color, order, position, size);
         }
     }

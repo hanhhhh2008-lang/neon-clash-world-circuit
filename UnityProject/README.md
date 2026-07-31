@@ -8,7 +8,7 @@ This directory is a separate Unity 6 project. The React/Canvas game at the repos
 2. Open `Assets/NeonClash/Scenes/VerticalSlice.unity` if it is not already open.
 3. Press Play.
 
-The selection screen exposes all 10 fighters, 10 stages, and 3 costumes defined by the web reference. Matches support a deterministic CPU, local player two, or the optional protocol-2 online flow. The visible roster uses an original painted full-body atlas over hidden deterministic pose scaffolding; every arena combines an original painted rooftop with motif-specific animated foregrounds. No third-party art dependency is required.
+The selection screen exposes all 10 fighters, 10 stages, and 3 costumes defined by the web reference. Matches support a deterministic CPU, local player two, or the optional protocol-2 online flow. The visible fighters use a project-owned painted provenance layer plus an articulated Unity primitive-mesh rig with independently posed limbs; every arena combines an original painted rooftop with restrained motif accents. No third-party art dependency is required.
 
 ### Controls
 
@@ -62,6 +62,8 @@ bash UnityProject/Tools/SimulationValidation/validate-simulation.sh
 See [`MIGRATION_PLAN.md`](MIGRATION_PLAN.md) for system boundaries, asset policy, networking direction, and the remaining migration scope.
 
 See [`ART_DIRECTION.md`](ART_DIRECTION.md) for the art pipeline, deterministic animation contract, and honest current quality ceiling. Rendered evidence is under [`Documentation/VisualQA`](Documentation/VisualQA).
+
+See [`TOOLS_RESEARCH.md`](TOOLS_RESEARCH.md) for the open-source 2D-to-3D tool review and the license-safe dimensional fighter decision.
 
 See [`QUALITY_TARGET.md`](QUALITY_TARGET.md) for the KOF XIV-inspired quality bar, completed gates, and remaining release work.
 

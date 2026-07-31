@@ -16,6 +16,7 @@ namespace NeonClash
         private KeyboardInputBuffer secondInput;
         private FighterPresentation firstView;
         private FighterPresentation secondView;
+        private CombatEffectsPresentation combatEffects;
         private readonly SpriteRenderer[] projectileViews = new SpriteRenderer[8];
         private bool initialized;
         private bool cpuEnabled = true;
@@ -30,6 +31,7 @@ namespace NeonClash
         private GUIStyle titleStyle;
         private GUIStyle labelStyle;
         private GUIStyle centredStyle;
+        private GUIStyle comboStyle;
 
         public void Initialize(FighterDefinition playerOne, FighterDefinition playerTwo)
         {
@@ -50,6 +52,7 @@ namespace NeonClash
             simulation = new DeterministicMatchSimulation(playerOne.ToTuning(), playerTwo.ToTuning());
             firstView = FighterPresentation.Create(playerOne, playerOneCostume, "P1 - " + playerOne.DisplayName, 50);
             secondView = FighterPresentation.Create(playerTwo, playerTwoCostume, "P2 - " + playerTwo.DisplayName, 100);
+            combatEffects = new CombatEffectsPresentation(transform);
             for (int i = 0; i < projectileViews.Length; i++)
             {
                 projectileViews[i] = NeonArtFactory.CreateFlat("Projectile " + i, transform, NeonShape.Disc, Color.white, 160 + i, Vector3.zero, new Vector2(0.55f, 0.55f));
@@ -91,6 +94,7 @@ namespace NeonClash
             CloseNetwork();
             if (firstView != null) firstView.Remove();
             if (secondView != null) secondView.Remove();
+            if (combatEffects != null) combatEffects.Remove();
             for (int i = 0; i < projectileViews.Length; i++) if (projectileViews[i] != null) Destroy(projectileViews[i].gameObject);
             initialized = false;
         }
@@ -142,6 +146,7 @@ namespace NeonClash
             bool secondWinner = state.Phase == MatchPhase.MatchOver ? state.SecondWins > state.FirstWins : state.Phase == MatchPhase.Knockout && state.RoundWinner == 1;
             if (firstView != null) firstView.Present(state.First, state.Tick, state.Phase, firstWinner);
             if (secondView != null) secondView.Present(state.Second, state.Tick, state.Phase, secondWinner);
+            if (combatEffects != null) combatEffects.Present(state, firstDefinition, secondDefinition);
         }
 
         private void UpdateProjectileViews()
@@ -192,7 +197,17 @@ namespace NeonClash
             if (touchControls) DrawTouchOverlay();
 
             if (state.Tick - state.LastHitTick < 14)
+            {
+                Color previous = GUI.color;
+                GUI.color = new Color(1f, 0.78f, 0.28f, 0.08f);
+                GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), Texture2D.whiteTexture);
+                GUI.color = previous;
                 GUI.Label(new Rect(0f, Screen.height * 0.35f, Screen.width, 48f), "IMPACT", titleStyle);
+            }
+            if (state.First.ComboCount > 1)
+                GUI.Label(new Rect(margin, 122f, barWidth, 34f), state.First.ComboCount + " HIT COMBO", comboStyle);
+            if (state.Second.ComboCount > 1)
+                GUI.Label(new Rect(Screen.width - margin - barWidth, 122f, barWidth, 34f), state.Second.ComboCount + " HIT COMBO", comboStyle);
             if (state.Phase == MatchPhase.Intro)
                 GUI.Label(new Rect(0f, Screen.height * 0.38f, Screen.width, 48f), state.PhaseTicks > 35 ? "ROUND " + state.Round : "FIGHT", titleStyle);
             if (state.Phase == MatchPhase.Knockout)
@@ -256,6 +271,9 @@ namespace NeonClash
             centredStyle.fontSize = Mathf.RoundToInt(Mathf.Clamp(Screen.height / 55f, 15f, 24f));
             centredStyle.fontStyle = FontStyle.Bold;
             centredStyle.normal.textColor = new Color(0.84f, 0.94f, 1f);
+            comboStyle = new GUIStyle(centredStyle);
+            comboStyle.fontSize = Mathf.RoundToInt(Mathf.Clamp(Screen.height / 34f, 20f, 34f));
+            comboStyle.normal.textColor = new Color(1f, 0.86f, 0.30f);
         }
 
         private void PumpNetworkMessages()
