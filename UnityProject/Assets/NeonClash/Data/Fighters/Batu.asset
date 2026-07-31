@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e682c03c7d0904f04bfbf7888024cd55, type: 3}
+  m_Name: Batu
+  m_EditorClassIdentifier: NeonClash.Runtime::NeonClash.FighterDefinition
+  fighterId: batu
+  displayName: BATU
+  alias: STEPPE WALL
+  city: ULAANBAATAR
+  style: Armor
+  specialName: Stone Wake
+  quote: I do not move.
+  mark: B
+  primaryColor: {r: 0.25490198, g: 0.84313726, b: 0.7490196, a: 1}
+  secondaryColor: {r: 0.14509805, g: 0.5294118, b: 0.6509804, a: 1}
+  speed: 5
+  power: 9
+  reach: 5
+  comboName: STEPPE QUAKE
+  comboSequence: K,Y,K,L
+  bodyBuild: 3
+  hairStyle: 7
+  outfitStyle: 7
+  energyStyle: 7

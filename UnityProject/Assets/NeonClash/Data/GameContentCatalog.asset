@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0454e56ad250d48e4b35e37695b7ba80, type: 3}
+  m_Name: GameContentCatalog
+  m_EditorClassIdentifier: NeonClash.Runtime::NeonClash.GameContentCatalog
+  fighters:
+  - {fileID: 11400000, guid: 74c20c7fbf3f943ed938f0d52c68e8ed, type: 2}
+  - {fileID: 11400000, guid: d89102ce91eb64d378cd84ccf83a54ce, type: 2}
+  - {fileID: 11400000, guid: 00b7e47149f4547d8a6e41dd08820f78, type: 2}
+  - {fileID: 11400000, guid: a4f8a5e39cf5b4dc3be7e1a95acb9bd7, type: 2}
+  - {fileID: 11400000, guid: a2f131a467f904e3290cf88053600b59, type: 2}
+  - {fileID: 11400000, guid: 201e78f368c6b451e8c7b2a36d0ce931, type: 2}
+  - {fileID: 11400000, guid: 4f2b6b1a4d50a4b189938ac58bb7092c, type: 2}
+  - {fileID: 11400000, guid: 2b769117ae2e74a4aa03e2703e07cbf6, type: 2}
+  - {fileID: 11400000, guid: 5ac3de6ad65ed473e94c8201f8383bf9, type: 2}
+  - {fileID: 11400000, guid: b6b947857a0354adb92af914d4fc06d3, type: 2}
+  stages:
+  - {fileID: 11400000, guid: 16ea3f2311e0b4919af184ae53338ffc, type: 2}
+  - {fileID: 11400000, guid: 3d83e3989c45d44a6affb6a48de7af5f, type: 2}
+  - {fileID: 11400000, guid: 5ac3b51aacf324922890227211b96f8e, type: 2}
+  - {fileID: 11400000, guid: cb8f79b1ca24b432ca0160fead46c85c, type: 2}
+  - {fileID: 11400000, guid: bce8b050a855a4377b4df8a882dd1b25, type: 2}
+  - {fileID: 11400000, guid: 3b1310218edec4d48a6b3665a95acf9a, type: 2}
+  - {fileID: 11400000, guid: 91c39aa3dc209494681896a4f27bcd2b, type: 2}
+  - {fileID: 11400000, guid: c431934b1f3f344318f0ea0829263483, type: 2}
+  - {fileID: 11400000, guid: 575ec63e002a346b78710786f5ab23b7, type: 2}
+  - {fileID: 11400000, guid: 246bfcf695520442b9d2c6be61e55849, type: 2}
+  costumes:
+  - {fileID: 11400000, guid: 64ff961750909434686e33134449e73b, type: 2}
+  - {fileID: 11400000, guid: 6f5cb00d6ba9b4c6381045d62b25dacd, type: 2}
+  - {fileID: 11400000, guid: 343275407b7554b4a9b4c0825b6240d9, type: 2}
+  sourceRevision: app/neon-clash.tsx:2026-07-24

@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e682c03c7d0904f04bfbf7888024cd55, type: 3}
+  m_Name: Oren
+  m_EditorClassIdentifier: NeonClash.Runtime::NeonClash.FighterDefinition
+  fighterId: oren
+  displayName: OREN
+  alias: TIDE MONK
+  city: SYDNEY
+  style: Control
+  specialName: Breaker Wave
+  quote: Breathe between impacts.
+  mark: O
+  primaryColor: {r: 0.28235295, g: 0.65882355, b: 1, a: 1}
+  secondaryColor: {r: 0.25882354, g: 0.9607843, b: 0.77254903, a: 1}
+  speed: 6
+  power: 7
+  reach: 9
+  comboName: TIDAL FORM
+  comboSequence: U,Y,K,L
+  bodyBuild: 1
+  hairStyle: 9
+  outfitStyle: 9
+  energyStyle: 9
