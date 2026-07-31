@@ -40,3 +40,15 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+
+# Unity project generated state (the source project lives in /UnityProject)
+/UnityProject/[Ll]ibrary/
+/UnityProject/[Tt]emp/
+/UnityProject/[Oo]bj/
+/UnityProject/[Bb]uild/
+/UnityProject/[Bb]uilds/
+/UnityProject/[Ll]ogs/
+/UnityProject/[Uu]ser[Ss]ettings/
+/UnityProject/MemoryCaptures/
+/UnityProject/Tools/SimulationValidation/bin/
+/UnityProject/Tools/SimulationValidation/obj/

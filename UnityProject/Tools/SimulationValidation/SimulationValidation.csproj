@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Assets/NeonClash/Scripts/Runtime/CombatTypes.cs" Link="CombatTypes.cs" />
+    <Compile Include="../../Assets/NeonClash/Scripts/Runtime/FighterSimulation.cs" Link="FighterSimulation.cs" />
+    <Compile Include="../../Assets/NeonClash/Scripts/Runtime/DeterministicCpu.cs" Link="DeterministicCpu.cs" />
+    <Compile Include="../../Assets/NeonClash/Scripts/Runtime/ComboSequenceTracker.cs" Link="ComboSequenceTracker.cs" />
+    <Compile Include="../../Assets/NeonClash/Scripts/Runtime/DeterministicMatchSimulation.cs" Link="DeterministicMatchSimulation.cs" />
+    <Compile Include="../../Assets/NeonClash/Scripts/Runtime/RollbackNetcode.cs" Link="RollbackNetcode.cs" />
+    <Compile Include="Program.cs" />
+  </ItemGroup>
+</Project>

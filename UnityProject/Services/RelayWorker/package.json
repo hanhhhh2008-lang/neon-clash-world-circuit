@@ -1,0 +1,9 @@
+{
+  "name": "neon-clash-relay-v2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check src/protocol.js && node --check src/index.js",
+    "test": "node --test"
+  }
+}

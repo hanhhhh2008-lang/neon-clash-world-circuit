@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e682c03c7d0904f04bfbf7888024cd55, type: 3}
+  m_Name: Zara
+  m_EditorClassIdentifier: NeonClash.Runtime::NeonClash.FighterDefinition
+  fighterId: zara
+  displayName: ZARA
+  alias: VOLT QUEEN
+  city: LAGOS
+  style: Pressure
+  specialName: Thunder Step
+  quote: Hear the storm arrive.
+  mark: Z
+  primaryColor: {r: 1, g: 0.1764706, b: 0.7294118, a: 1}
+  secondaryColor: {r: 0.5411765, g: 0.23137255, b: 1, a: 1}
+  speed: 8
+  power: 7
+  reach: 5
+  comboName: VOLTAGE RUSH
+  comboSequence: T,U,Y,L
+  bodyBuild: 1
+  hairStyle: 1
+  outfitStyle: 1
+  energyStyle: 1
